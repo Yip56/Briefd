@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F5F3EE;
+    --surface: #FFFFFF;
+    --surface2: #F0EDE7;
+    --border: rgba(0,0,0,0.1);
+    --border-strong: rgba(0,0,0,0.18);
+    --text: #1A1916;
+    --text-2: #6B6860;
+    --text-3: #9E9C96;
+    --accent: #1D5C3A;
+    --accent-light: #E6F0EB;
+    --accent-mid: #2E7D52;
+    --tag-bg: #EEF7F2;
+    --tag-text: #1D5C3A;
+    --high: #FDF3E7;
+    --high-border: #F0A500;
+    --high-text: #7A4F00;
+    --pill-inactive: #ECEAE4;
+    --pill-text: #5C5A54;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .serif { font-family: 'Instrument Serif', serif; }
+
+  /* NAV */
+  nav {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-family: 'Instrument Serif', serif; font-size: 22px; color: var(--accent); letter-spacing: -0.5px; }
+  .logo span { color: var(--text-2); font-size: 13px; font-family: 'DM Sans', sans-serif; margin-left: 8px; font-weight: 300; }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-tab { font-size: 13px; color: var(--text-2); padding: 6px 14px; border-radius: 20px; cursor: pointer; border: none; background: transparent; transition: all 0.15s; }
+  .nav-tab:hover { background: var(--surface2); color: var(--text); }
+  .nav-tab.active { background: var(--accent); color: #fff; }
+
+  /* VIEWS */
+  .view { display: none; padding: 24px; max-width: 720px; margin: 0 auto; }
+  .view.active { display: block; }
+
+  /* ONBOARDING */
+  .onboard-hero { text-align: center; padding: 40px 0 32px; }
+  .onboard-hero h1 { font-family: 'Instrument Serif', serif; font-size: 36px; color: var(--text); font-weight: 400; line-height: 1.2; margin-bottom: 8px; }
+  .onboard-hero p { color: var(--text-2); font-size: 15px; max-width: 400px; margin: 0 auto; }
+
+  .section-label { font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: var(--text-3); text-transform: uppercase; margin-bottom: 12px; margin-top: 28px; }
+
+  .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .profile-field { display: flex; flex-direction: column; gap: 5px; }
+  .profile-field label { font-size: 12px; color: var(--text-2); font-weight: 500; }
+  .profile-field select, .profile-field input {
+    background: var(--surface);
+    border: 0.5px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    width: 100%;
+    transition: border-color 0.15s;
+  }
+  .profile-field select:focus, .profile-field input:focus { border-color: var(--accent); }
+
+  .preset-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .preset-chip {
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    border: 0.5px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .preset-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-chip.selected { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .keyword-row { display: flex; gap: 8px; margin-top: 10px; }
+  .keyword-row input { flex: 1; background: var(--surface); border: 0.5px solid var(--border-strong); border-radius: 8px; padding: 9px 12px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+  .keyword-row input:focus { border-color: var(--accent); }
+  .add-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 0 16px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; }
+  .keyword-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .keyword-tag { background: var(--tag-bg); color: var(--tag-text); padding: 4px 10px; border-radius: 12px; font-size: 12px; display: flex; align-items: center; gap: 5px; }
+  .keyword-tag button { background: none; border: none; color: var(--accent-mid); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+
+  .schedule-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+
+  .cta-btn {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 32px;
+    transition: opacity 0.15s;
+  }
+  .cta-btn:hover { opacity: 0.88; }
+
+  /* DIGEST VIEW */
+  .digest-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px; padding-top: 8px; }
+  .digest-header h2 { font-family: 'Instrument Serif', serif; font-size: 28px; font-weight: 400; }
+  .digest-header .date { font-size: 13px; color: var(--text-2); }
+
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+  .filter-pill {
+    padding: 5px 13px;
+    border-radius: 16px;
+    font-size: 12px;
+    background: var(--pill-inactive);
+    color: var(--pill-text);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .filter-pill:hover { background: var(--accent-light); color: var(--accent); }
+  .filter-pill.active { background: var(--accent); color: #fff; }
+
+  .news-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .news-card:hover { border-color: var(--border-strong); }
+  .news-card.high-impact { border-left: 3px solid var(--high-border); }
+
+  .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .source-tag { font-size: 11px; color: var(--text-3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .topic-chip { font-size: 11px; background: var(--tag-bg); color: var(--tag-text); padding: 2px 8px; border-radius: 8px; font-weight: 500; }
+  .impact-badge { font-size: 11px; background: var(--high); color: var(--high-text); padding: 2px 8px; border-radius: 8px; font-weight: 500; }
+
+  .card-summary { font-size: 14px; color: var(--text); line-height: 1.65; margin-bottom: 10px; }
+  .card-summary strong { font-weight: 500; }
+
+  .card-actions { display: flex; align-items: center; justify-content: space-between; }
+  .read-link { font-size: 12px; color: var(--accent); text-decoration: none; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+  .read-link:hover { opacity: 0.75; }
+  .vote-row { display: flex; gap: 6px; }
+  .vote-btn {
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-2);
+  }
+  .vote-btn:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  .vote-btn.voted-up { background: #E6F0EB; color: var(--accent); border-color: var(--accent); }
+  .vote-btn.voted-down { background: #FEF0F0; color: #C0392B; border-color: #E88; }
+
+  .refresh-row { display: flex; justify-content: center; margin: 20px 0; }
+  .refresh-btn { background: var(--surface); border: 0.5px solid var(--border-strong); border-radius: 20px; padding: 8px 20px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-2); cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .refresh-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* LOADING */
+  .loading-overlay { text-align: center; padding: 60px 20px; }
+  .loading-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 16px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse { 0%,80%,100%{opacity:0.2;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+  .loading-overlay p { color: var(--text-2); font-size: 14px; font-style: italic; }
+
+  /* SETTINGS */
+  .settings-card { background: var(--surface); border: 0.5px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 14px; }
+  .settings-card h3 { font-size: 14px; font-weight: 500; margin-bottom: 14px; color: var(--text); }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 0.5px solid var(--border); }
+  .settings-row:last-child { border-bottom: none; }
+  .settings-row label { font-size: 13px; color: var(--text-2); }
+  .settings-row select, .settings-row input { background: var(--surface2); border: 0.5px solid var(--border); border-radius: 6px; padding: 5px 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+  .save-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; margin-top: 16px; }
+
+  .algo-explainer { background: var(--accent-light); border: 0.5px solid rgba(29,92,58,0.2); border-radius: 10px; padding: 14px 16px; margin-top: 16px; }
+  .algo-explainer h4 { font-size: 12px; font-weight: 500; color: var(--accent); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .algo-explainer p { font-size: 12px; color: #2E5A3E; line-height: 1.7; }
+
+  .empty-state { text-align: center; padding: 48px 20px; color: var(--text-2); }
+  .empty-state .big { font-size: 32px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">Briefd <span>your daily signal</span></div>
+  <div class="nav-right">
+    <button class="nav-tab active" onclick="showView('digest')">Today</button>
+    <button class="nav-tab" onclick="showView('settings')">Preferences</button>
+    <button class="nav-tab" onclick="showView('onboard')">Setup</button>
+  </div>
+</nav>
+
+<!-- ONBOARDING -->
+<div class="view active" id="view-onboard">
+  <div class="onboard-hero">
+    <h1 class="serif">Tell us who you are.<br>We'll find what matters.</h1>
+    <p>Briefd filters the noise — so you only see news that actually affects your life.</p>
+  </div>
+
+  <div class="section-label">Your profile</div>
+  <div class="profile-grid">
+    <div class="profile-field">
+      <label>Occupation</label>
+      <select id="p-occupation">
+        <option>Student</option>
+        <option>Fresh Graduate</option>
+        <option>Employed (Private)</option>
+        <option>Employed (Government)</option>
+        <option>Self-Employed / Freelance</option>
+        <option>Business Owner</option>
+        <option>Investor</option>
+        <option>Homemaker</option>
+      </select>
+    </div>
+    <div class="profile-field">
+      <label>Location</label>
+      <select id="p-location">
+        <option>Kuala Lumpur</option>
+        <option>Selangor</option>
+        <option>Penang</option>
+        <option>Johor</option>
+        <option>Sabah</option>
+        <option>Sarawak</option>
+        <option>Other Malaysia</option>
+      </select>
+    </div>
+    <div class="profile-field">
+      <label>Life stage</label>
+      <select id="p-stage">
+        <option>Renting</option>
+        <option>Property owner</option>
+        <option>Looking to buy property</option>
+        <option>Investing in property</option>
+        <option>Living with family</option>
+      </select>
+    </div>
+    <div class="profile-field">
+      <label>Vehicle</label>
+      <select id="p-vehicle">
+        <option>Car owner</option>
+        <option>Motorcycle owner</option>
+        <option>Both</option>
+        <option>No vehicle</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="section-label">Topic presets</div>
+  <div class="preset-grid" id="preset-grid">
+    <div class="preset-chip selected" data-topic="Economy">💹 Economy</div>
+    <div class="preset-chip selected" data-topic="Fuel & Transport">⛽ Fuel & Transport</div>
+    <div class="preset-chip" data-topic="Property">🏠 Property</div>
+    <div class="preset-chip" data-topic="Jobs & Career">💼 Jobs & Career</div>
+    <div class="preset-chip selected" data-topic="Malaysian Politics">🏛 Malaysian Politics</div>
+    <div class="preset-chip" data-topic="Tech & AI">🤖 Tech & AI</div>
+    <div class="preset-chip" data-topic="Health">❤️ Health</div>
+    <div class="preset-chip" data-topic="Startups">🚀 Startups</div>
+    <div class="preset-chip" data-topic="Global News">🌍 Global News</div>
+    <div class="preset-chip" data-topic="Finance & Investing">📈 Finance & Investing</div>
+  </div>
+
+  <div class="section-label">Custom keywords</div>
+  <div class="keyword-row">
+    <input type="text" id="kw-input" placeholder='e.g. "EPF", "Ringgit", "semiconductor"' />
+    <button class="add-btn" onclick="addKeyword()">Add</button>
+  </div>
+  <div class="keyword-tags" id="kw-tags"></div>
+
+  <div class="section-label">Digest schedule</div>
+  <div class="schedule-row">
+    <div class="profile-field">
+      <label>Delivery time</label>
+      <input type="time" id="sched-time" value="08:00" />
+    </div>
+    <div class="profile-field">
+      <label>Email (optional)</label>
+      <input type="email" id="sched-email" placeholder="you@email.com" />
+    </div>
+  </div>
+
+  <button class="cta-btn" onclick="buildDigest()">Generate my daily digest →</button>
+</div>
+
+<!-- DIGEST VIEW -->
+<div class="view" id="view-digest">
+  <div class="digest-header">
+    <h2 class="serif">Your digest</h2>
+    <span class="date" id="digest-date"></span>
+  </div>
+
+  <div class="filter-bar" id="filter-bar"></div>
+
+  <div id="digest-content">
+    <div class="empty-state">
+      <div class="big">📰</div>
+      <p>Complete setup to generate your personalised digest.</p>
+    </div>
+  </div>
+
+  <div class="refresh-row">
+    <button class="refresh-btn" onclick="refreshDigest()">↻ Refresh digest</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div class="view" id="view-settings">
+  <div style="padding-top: 8px; margin-bottom: 20px;">
+    <h2 class="serif" style="font-size: 26px; font-weight: 400;">Preferences</h2>
+  </div>
+
+  <div class="settings-card">
+    <h3>Digest schedule</h3>
+    <div class="settings-row">
+      <label>Delivery time</label>
+      <input type="time" value="08:00" />
+    </div>
+    <div class="settings-row">
+      <label>Frequency</label>
+      <select>
+        <option>Daily</option>
+        <option>Weekdays only</option>
+        <option>Weekly (Monday)</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label>Email digest</label>
+      <input type="email" placeholder="you@email.com" />
+    </div>
+  </div>
+
+  <div class="settings-card">
+    <h3>Content filters</h3>
+    <div class="settings-row">
+      <label>Minimum relevance score</label>
+      <select>
+        <option>Show all</option>
+        <option>Medium + High impact only</option>
+        <option>High impact only</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label>Max articles per digest</label>
+      <select>
+        <option>5 articles</option>
+        <option selected>10 articles</option>
+        <option>15 articles</option>
+        <option>20 articles</option>
+      </select>
+    </div>
+    <div class="settings-row">
+      <label>Sources</label>
+      <select>
+        <option>All sources</option>
+        <option>News only</option>
+        <option>News + Reddit</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="algo-explainer">
+    <h4>How your algorithm works</h4>
+    <p>Every article is scored across three signals: <strong>recency</strong> (newer = higher), <strong>profile match</strong> (how closely it relates to your occupation, location, and life stage), and <strong>topic relevance</strong> (keyword match strength). Your 👍 / 👎 feedback adjusts topic weights over time — the more you use it, the sharper it gets.</p>
+  </div>
+
+  <button class="save-btn" onclick="alert('Preferences saved!')">Save preferences</button>
+</div>
+
+<script>
+  const ARTICLES = [
+    {
+      id: 1,
+      title: "RON95 subsidy rationalisation may begin Q3 2025",
+      summary: "The government is considering limiting the RON95 fuel subsidy to lower-income groups only, which could raise pump prices for the general public by an estimated 30–40 sen per litre.",
+      source: "Free Malaysia Today",
+      url: "https://www.freemalaysiatoday.com",
+      topic: "Fuel & Transport",
+      impactLevel: "high",
+      profileMatch: ["Car owner","Motorcycle owner","Both"],
+      recency: 0.97
+    },
+    {
+      id: 2,
+      title: "EPF announces new Account 3 withdrawal rules",
+      summary: "EPF members may now withdraw from Account 3 (Flexible Account) at any time with no minimum holding period, effective immediately — a major change from the earlier 3-month lock-in policy.",
+      source: "The Star",
+      url: "https://www.thestar.com.my",
+      topic: "Economy",
+      impactLevel: "high",
+      profileMatch: ["Employed (Private)","Employed (Government)","Fresh Graduate","Self-Employed / Freelance"],
+      recency: 0.95
+    },
+    {
+      id: 3,
+      title: "Bank Negara holds OPR at 3.00% for fifth consecutive meeting",
+      summary: "Malaysia's central bank kept its overnight policy rate unchanged, signalling stable borrowing costs for now — good news for those with variable-rate home loans or car loans.",
+      source: "Reuters",
+      url: "https://www.reuters.com",
+      topic: "Economy",
+      impactLevel: "medium",
+      profileMatch: ["Property owner","Looking to buy property","Business Owner","Investor"],
+      recency: 0.91
+    },
+    {
+      id: 4,
+      title: "KL property prices rise 4.2% year-on-year in Q1",
+      summary: "Residential property prices in Kuala Lumpur grew 4.2% compared to last year, driven by strong demand in Cheras and Kepong. Analysts expect the trend to continue into Q3.",
+      source: "EdgeProp",
+      url: "https://www.edgeprop.my",
+      topic: "Property",
+      impactLevel: "medium",
+      profileMatch: ["Renting","Looking to buy property","Investing in property"],
+      recency: 0.88
+    },
+    {
+      id: 5,
+      title: "Malaysia to create 50,000 AI-related jobs by 2026",
+      summary: "Under the Madani Economy framework, the government is targeting 50,000 new positions in AI, cloud computing, and data engineering — with priority placement for fresh graduates and career-switchers.",
+      source: "Bernama",
+      url: "https://www.bernama.com",
+      topic: "Jobs & Career",
+      impactLevel: "medium",
+      profileMatch: ["Student","Fresh Graduate","Employed (Private)"],
+      recency: 0.85
+    },
+    {
+      id: 6,
+      title: "Ringgit strengthens to 4.42 against USD, highest since 2023",
+      summary: "The Malaysian Ringgit hit a multi-year high against the US Dollar, boosted by improved trade data and Foreign reserves. This reduces import costs and may lower prices for electronics and imported goods.",
+      source: "The Star",
+      url: "https://www.thestar.com.my",
+      topic: "Economy",
+      impactLevel: "medium",
+      profileMatch: [],
+      recency: 0.93
+    },
+    {
+      id: 7,
+      title: "Grab Malaysia rolls out mandatory driver safety re-certification",
+      summary: "All active Grab drivers in Malaysia must complete a new digital safety certification by end of August or risk account suspension. Riders may experience reduced availability during the transition period.",
+      source: "Free Malaysia Today",
+      url: "https://www.freemalaysiatoday.com",
+      topic: "Fuel & Transport",
+      impactLevel: "low",
+      profileMatch: [],
+      recency: 0.80
+    },
+    {
+      id: 8,
+      title: "Tech layoffs slow — Malaysian tech hiring picks up in June",
+      summary: "After 18 months of global tech layoffs, hiring activity in Malaysia's tech sector has rebounded, particularly for cloud engineers, product managers, and full-stack developers.",
+      source: "Tech in Asia",
+      url: "https://www.techinasia.com",
+      topic: "Tech & AI",
+      impactLevel: "medium",
+      profileMatch: ["Student","Fresh Graduate","Employed (Private)"],
+      recency: 0.87
+    }
+  ];
+
+  let userProfile = { occupation: 'Student', location: 'Selangor', stage: 'Renting', vehicle: 'Car owner' };
+  let selectedTopics = new Set(['Economy', 'Fuel & Transport', 'Malaysian Politics']);
+  let customKeywords = [];
+  let votes = {};
+  let activeFilter = 'All';
+  let digestGenerated = false;
+
+  function showView(v) {
+    document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+    document.getElementById('view-' + v).classList.add('active');
+    event.target.classList.add('active');
+    if (v === 'digest' && digestGenerated) renderDigest();
+  }
+
+  document.querySelectorAll('.preset-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('selected');
+      const t = chip.dataset.topic;
+      if (selectedTopics.has(t)) selectedTopics.delete(t);
+      else selectedTopics.add(t);
+    });
+  });
+
+  function addKeyword() {
+    const inp = document.getElementById('kw-input');
+    const val = inp.value.trim();
+    if (!val) return;
+    customKeywords.push(val);
+    inp.value = '';
+    renderKeywords();
+  }
+
+  document.getElementById('kw-input').addEventListener('keydown', e => { if (e.key === 'Enter') addKeyword(); });
+
+  function renderKeywords() {
+    const c = document.getElementById('kw-tags');
+    c.innerHTML = customKeywords.map((k, i) =>
+      `<span class="keyword-tag">${k}<button onclick="removeKeyword(${i})">×</button></span>`
+    ).join('');
+  }
+
+  function removeKeyword(i) {
+    customKeywords.splice(i, 1);
+    renderKeywords();
+  }
+
+  function scoreArticle(article) {
+    let score = article.recency * 40;
+    if (selectedTopics.has(article.topic)) score += 30;
+    if (article.profileMatch.includes(userProfile.vehicle) ||
+        article.profileMatch.includes(userProfile.occupation) ||
+        article.profileMatch.includes(userProfile.stage)) score += 25;
+    customKeywords.forEach(kw => {
+      if (article.title.toLowerCase().includes(kw.toLowerCase()) ||
+          article.summary.toLowerCase().includes(kw.toLowerCase())) score += 15;
+    });
+    const voteKey = article.id;
+    if (votes[voteKey] === 'up') score += 10;
+    if (votes[voteKey] === 'down') score -= 20;
+    return score;
+  }
+
+  function buildDigest() {
+    userProfile.occupation = document.getElementById('p-occupation').value;
+    userProfile.location = document.getElementById('p-location').value;
+    userProfile.stage = document.getElementById('p-stage').value;
+    userProfile.vehicle = document.getElementById('p-vehicle').value;
+    digestGenerated = true;
+
+    document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-tab')[0].classList.add('active');
+    document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+
+    const digestView = document.getElementById('view-digest');
+    digestView.classList.add('active');
+    const content = document.getElementById('digest-content');
+    content.innerHTML = `<div class="loading-overlay"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><p>Scoring articles against your profile…</p></div>`;
+
+    setTimeout(() => renderDigest(), 1800);
+  }
+
+  function renderDigest() {
+    const now = new Date();
+    document.getElementById('digest-date').textContent = now.toLocaleDateString('en-MY', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const scored = ARTICLES
+      .map(a => ({ ...a, score: scoreArticle(a) }))
+      .sort((a, b) => b.score - a.score);
+
+    const topics = ['All', ...new Set(scored.map(a => a.topic))];
+    const filterBar = document.getElementById('filter-bar');
+    filterBar.innerHTML = topics.map(t =>
+      `<button class="filter-pill ${activeFilter === t ? 'active' : ''}" onclick="setFilter('${t}')">${t}</button>`
+    ).join('');
+
+    const filtered = activeFilter === 'All' ? scored : scored.filter(a => a.topic === activeFilter);
+    const content = document.getElementById('digest-content');
+
+    if (filtered.length === 0) {
+      content.innerHTML = '<div class="empty-state"><div class="big">🔍</div><p>No articles match this filter.</p></div>';
+      return;
+    }
+
+    content.innerHTML = filtered.map(a => {
+      const isHigh = a.impactLevel === 'high';
+      const voteState = votes[a.id] || '';
+      return `
+        <div class="news-card ${isHigh ? 'high-impact' : ''}">
+          <div class="card-top">
+            <div class="card-meta">
+              <span class="source-tag">${a.source}</span>
+              <span class="topic-chip">${a.topic}</span>
+              ${isHigh ? '<span class="impact-badge">⚡ High impact</span>' : ''}
+            </div>
+            <span style="font-size:11px;color:var(--text-3)">Score: ${Math.round(a.score)}</span>
+          </div>
+          <p class="card-summary">${a.summary}</p>
+          <div class="card-actions">
+            <a class="read-link" href="${a.url}" target="_blank">Read full article →</a>
+            <div class="vote-row">
+              <button class="vote-btn ${voteState === 'up' ? 'voted-up' : ''}" onclick="vote(${a.id},'up')">👍 Relevant</button>
+              <button class="vote-btn ${voteState === 'down' ? 'voted-down' : ''}" onclick="vote(${a.id},'down')">👎 Not for me</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function setFilter(t) {
+    activeFilter = t;
+    renderDigest();
+  }
+
+  function vote(id, dir) {
+    votes[id] = votes[id] === dir ? null : dir;
+    renderDigest();
+  }
+
+  function refreshDigest() {
+    if (!digestGenerated) { alert('Complete setup first.'); return; }
+    const content = document.getElementById('digest-content');
+    content.innerHTML = `<div class="loading-overlay"><div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div><p>Refreshing and re-scoring…</p></div>`;
+    setTimeout(() => renderDigest(), 1200);
+  }
+</script>
+</body>
+</html>

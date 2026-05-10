@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Typography */
+  --font-sans: var(--font-dm-sans);
+  --font-serif: var(--font-instrument-serif);
+
+  /* Brand */
+  --color-brand:       #1D5C3A;
+  --color-brand-hover: #174d31;
+  --color-brand-light: #e8f5ee;
+  --color-brand-ring:  #1D5C3A40;
+
+  /* Surfaces */
+  --color-app-bg: #F5F3EE;
+  --color-card:   #ffffff;
+}
+
+:root {
+  --background: #F5F3EE;
+  --foreground: #1a1a1a;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Ultra-thin card border helper */
+.card-border {
+  border: 0.5px solid rgb(0 0 0 / 0.1);
+}
