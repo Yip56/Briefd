@@ -1,4 +1,6 @@
 import type { RawArticle, UserPreferences, DigestResult, ScoredArticle, VoteValue, UserAlgorithmSettings } from "@/lib/types";
+
+export type EnrichmentCache = Map<string, { aiSummary?: string | null; impactAnalysis?: string | null }>;
 import { scoreArticles } from "@/lib/scoring/ranker";
 import { summariseArticle, getImpactAnalysis } from "./summarise";
 
@@ -24,7 +26,8 @@ export async function buildDigest(
   preferences: UserPreferences,
   feedbackMap: Record<string, VoteValue>,
   algorithmSettings?: UserAlgorithmSettings | null,
-  clickedArticleUrls?: Set<string>
+  clickedArticleUrls?: Set<string>,
+  enrichmentCache?: EnrichmentCache
 ): Promise<DigestResult> {
   const scored = scoreArticles(rawArticles, preferences, feedbackMap, algorithmSettings, clickedArticleUrls);
   const totalScored = scored.length;
@@ -107,8 +110,9 @@ export async function buildDigest(
           topic: article.topic ?? "",
           publishedAt: article.published_at ?? new Date().toISOString(),
         };
-        const aiSummary     = await summariseArticle(raw, preferences.profile);
-        const impactAnalysis = await getImpactAnalysis(raw, preferences.profile, geminiProfile || undefined);
+        const cached         = enrichmentCache?.get(raw.externalId);
+        const aiSummary      = cached?.aiSummary      || await summariseArticle(raw, preferences.profile);
+        const impactAnalysis = cached?.impactAnalysis || await getImpactAnalysis(raw, preferences.profile, geminiProfile || undefined);
         return { ...article, aiSummary, impactAnalysis };
       }
   );
