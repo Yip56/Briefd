@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAllSources } from "@/lib/sources";
 import { buildDigest } from "@/lib/ai/digest";
+import { GEMINI_QUOTA_EXCEEDED, geminiQuotaRetryAfter } from "@/lib/ai/summarise";
 import type { VoteValue } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -126,5 +127,9 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json(digest);
+  const quotaHit = digest.articles.some((a) => a.impactAnalysis === GEMINI_QUOTA_EXCEEDED);
+  return NextResponse.json({
+    ...digest,
+    geminiQuotaRetryAfter: quotaHit ? geminiQuotaRetryAfter : null,
+  });
 }

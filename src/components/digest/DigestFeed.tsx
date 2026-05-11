@@ -140,7 +140,19 @@ function DigestFeedInner() {
           <span className="shrink-0 mt-0.5">⚡</span>
           <div>
             <span className="font-medium">Impact analysis paused</span>
-            {" — "}your Gemini API quota is exceeded. Top up your billing at{" "}
+            {" — "}your Gemini API quota is exceeded.{" "}
+            {digest?.geminiQuotaRetryAfter && (
+              <span>
+                Resets on{" "}
+                <span className="font-medium">
+                  {new Date(digest.geminiQuotaRetryAfter).toLocaleDateString("en-MY", {
+                    day: "numeric", month: "long", year: "numeric",
+                  })}
+                </span>
+                .{" "}
+              </span>
+            )}
+            Top up early at{" "}
             <a
               href="https://aistudio.google.com/billing"
               target="_blank"
@@ -148,8 +160,8 @@ function DigestFeedInner() {
               className="underline hover:text-amber-900"
             >
               aistudio.google.com/billing
-            </a>{" "}
-            and it will work again on your next refresh.
+            </a>
+            .
           </div>
         </div>
       )}

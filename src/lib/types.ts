@@ -106,6 +106,7 @@ export interface DigestResult {
   articles: ScoredArticle[]
   generatedAt: string
   totalScored: number
+  geminiQuotaRetryAfter?: string | null
 }
 
 export interface UserAlgorithmSettings {

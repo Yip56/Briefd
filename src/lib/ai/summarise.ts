@@ -1,6 +1,7 @@
 import type { RawArticle, Profile } from "@/lib/types";
 
 export const GEMINI_QUOTA_EXCEEDED = "__GEMINI_QUOTA_EXCEEDED__";
+export let geminiQuotaRetryAfter: string | null = null;
 
 const GEMINI_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
@@ -27,6 +28,21 @@ async function callGemini(prompt: string): Promise<string> {
     const body = await res.text().catch(() => "");
     console.error(`[Gemini] HTTP ${res.status}:`, body.slice(0, 200));
     if (res.status === 429 || body.toLowerCase().includes("quota") || body.toLowerCase().includes("billing")) {
+      const retryAfter = res.headers.get("Retry-After");
+      if (retryAfter) {
+        // Retry-After is either seconds or an HTTP date string
+        const secs = Number(retryAfter);
+        if (!isNaN(secs)) {
+          geminiQuotaRetryAfter = new Date(Date.now() + secs * 1000).toISOString();
+        } else {
+          geminiQuotaRetryAfter = new Date(retryAfter).toISOString();
+        }
+      } else {
+        // Billing quota: resets on 1st of next month
+        const now = new Date();
+        const reset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        geminiQuotaRetryAfter = reset.toISOString();
+      }
       return GEMINI_QUOTA_EXCEEDED;
     }
     return "";
