@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(npm install *)"
+      "PowerShell(npm install *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\YLX\\\\briefd\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Sort-Object)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)"
     ]
   }
 }

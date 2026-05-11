@@ -1,7 +1,7 @@
 import type { RawArticle, Profile, ImpactLevel } from "@/lib/types";
 
-const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-4-20250514";
+const GEMINI_ENDPOINT =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
 const FALLBACK = { impactLevel: "medium" as ImpactLevel, reason: "general news" };
 
@@ -9,7 +9,7 @@ export async function getAiImpactScore(
   article: RawArticle,
   profile: Profile
 ): Promise<{ impactLevel: ImpactLevel; reason: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return FALLBACK;
 
   const prompt =
@@ -21,24 +21,18 @@ export async function getAiImpactScore(
     `Reply with JSON only: {"impactLevel": "high|medium|low", "reason": "one short phrase"}`;
 
   try {
-    const res = await fetch(ANTHROPIC_API, {
+    const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 60,
-        messages: [{ role: "user", content: prompt }],
+        contents: [{ parts: [{ text: prompt }] }],
       }),
     });
 
     if (!res.ok) return FALLBACK;
 
     const data = await res.json();
-    const text: string = data?.content?.[0]?.text ?? "";
+    const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 
     // Extract JSON even if the model adds prose around it
     const match = text.match(/\{[\s\S]*?\}/);

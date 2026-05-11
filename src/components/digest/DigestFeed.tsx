@@ -7,6 +7,7 @@ import { DigestErrorBoundary } from "./DigestErrorBoundary";
 import { LoadingDots } from "@/components/ui/LoadingDots";
 import { useToast } from "@/components/ui/Toast";
 import type { DigestResult, ScoredArticle } from "@/lib/types";
+import { GEMINI_QUOTA_EXCEEDED } from "@/lib/ai/summarise";
 
 function formatDateHeader(): string {
   const now  = new Date();
@@ -132,6 +133,26 @@ function DigestFeedInner() {
           </button>
         </div>
       </div>
+
+      {/* Gemini quota banner */}
+      {articles.some((a) => a.impactAnalysis === GEMINI_QUOTA_EXCEEDED) && (
+        <div className="mb-4 flex items-start gap-2.5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-[13px] text-amber-800">
+          <span className="shrink-0 mt-0.5">⚡</span>
+          <div>
+            <span className="font-medium">Impact analysis paused</span>
+            {" — "}your Gemini API quota is exceeded. Top up your billing at{" "}
+            <a
+              href="https://aistudio.google.com/billing"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-amber-900"
+            >
+              aistudio.google.com/billing
+            </a>{" "}
+            and it will work again on your next refresh.
+          </div>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="mb-4">

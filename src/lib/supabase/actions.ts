@@ -2,7 +2,34 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServerClient } from "@supabase/ssr";
 import type { UserPreferences } from "@/lib/types";
+
+// Service-role client bypasses RLS — for server-only operations
+function createServiceClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  );
+}
+
+export async function createUserProfile(
+  userId: string,
+  email: string
+): Promise<{ error: string | null }> {
+  const supabase = createServiceClient();
+  const { error } = await supabase
+    .from("profiles")
+    .insert({ id: userId, email })
+    .single();
+
+  // 23505 = unique_violation — profile already exists, that's fine
+  if (error && error.code !== "23505") {
+    return { error: error.message };
+  }
+  return { error: null };
+}
 
 export async function signOut() {
   const supabase = await createClient();

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ScoredArticle } from "@/lib/types";
+import { GEMINI_QUOTA_EXCEEDED } from "@/lib/ai/summarise";
 import { useToast } from "@/components/ui/Toast";
 import { clsx } from "clsx";
 
@@ -192,7 +193,9 @@ export function ArticleCard({ article, onRemove }: ArticleCardProps) {
         </p>
 
         {/* Impact analysis block */}
-        {article.impactAnalysis && article.impactAnalysis !== "Impact analysis unavailable for this article." && (
+        {article.impactAnalysis &&
+         article.impactAnalysis !== "Impact analysis unavailable for this article." &&
+         article.impactAnalysis !== GEMINI_QUOTA_EXCEEDED && (
           <div
             style={{
               background: "#FDF8ED",

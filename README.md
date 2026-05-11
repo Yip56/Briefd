@@ -131,3 +131,10 @@ When you request a digest, Briefd fetches up to 100 articles from six Malaysian 
                              │  links in email │
                              └─────────────────┘
 ```
+  │      Email       │  Password   │            Profile            │                                                                                                                                                           
+  ├──────────────────┼─────────────┼───────────────────────────────┤                                                                                                                                                           
+  │ test1@briefd.app │ password123 │ KL, employed, car owner       │                                                                                                                                                           
+  ├──────────────────┼─────────────┼───────────────────────────────┤
+  │ test2@briefd.app │ password123 │ Selangor, student, motorcycle │
+  ├──────────────────┼─────────────┼───────────────────────────────┤
+  │ test3@briefd.app │ password123 │ Penang, business owner        

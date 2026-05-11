@@ -1,5 +1,7 @@
 import type { RawArticle, Profile } from "@/lib/types";
 
+export const GEMINI_QUOTA_EXCEEDED = "__GEMINI_QUOTA_EXCEEDED__";
+
 const GEMINI_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
@@ -24,6 +26,9 @@ async function callGemini(prompt: string): Promise<string> {
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     console.error(`[Gemini] HTTP ${res.status}:`, body.slice(0, 200));
+    if (res.status === 429 || body.toLowerCase().includes("quota") || body.toLowerCase().includes("billing")) {
+      return GEMINI_QUOTA_EXCEEDED;
+    }
     return "";
   }
   const data = await res.json();
@@ -51,6 +56,7 @@ export async function summariseArticle(
 
   try {
     const text = await callGemini(prompt);
+    if (text === GEMINI_QUOTA_EXCEEDED) return article.summary.slice(0, 200);
     return text || article.summary.slice(0, 200);
   } catch {
     return article.summary.slice(0, 200);
@@ -84,6 +90,7 @@ export async function getImpactAnalysis(
 
   try {
     const text = await callGemini(prompt);
+    if (text === GEMINI_QUOTA_EXCEEDED) return GEMINI_QUOTA_EXCEEDED;
     return text || "Impact analysis unavailable for this article.";
   } catch {
     return "Impact analysis unavailable for this article.";

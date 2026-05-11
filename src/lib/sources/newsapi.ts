@@ -38,7 +38,7 @@ async function fetchQuery(q: string, topic: string, apiKey: string): Promise<Raw
   return data.articles
     .filter((a) => a.title && a.url && a.title !== "[Removed]")
     .map((a) => ({
-      externalId: `newsapi-${Buffer.from(a.url).toString("base64").slice(0, 24)}`,
+      externalId: `newsapi-${a.url.replace(/[^a-zA-Z0-9]/g, "_")}`,
       title: a.title,
       summary: a.description ?? "",
       sourceName: a.source.name ?? "NewsAPI",
@@ -49,27 +49,21 @@ async function fetchQuery(q: string, topic: string, apiKey: string): Promise<Raw
     }));
 }
 
+// Fetches each topic separately so every topic gets ≥10 article candidates before scoring
 export async function fetchNewsApiArticles(
   topics: string[],
   apiKey: string
 ): Promise<RawArticle[]> {
   if (!apiKey || topics.length === 0) return [];
 
-  // Topic query — joins all topics with OR so we get broad coverage
-  const topicQuery = topics.map((t) => `"${t}"`).join(" OR ");
+  const results = await Promise.allSettled(
+    topics.map((topic) => fetchQuery(`"${topic}"`, topic, apiKey))
+  );
 
-  // Malaysia-focused variant to anchor results geographically
-  const malaysiaQuery = "Malaysia AND (" + topics.slice(0, 5).map((t) => `"${t}"`).join(" OR ") + ")";
-
-  const [topicResults, malaysiaResults] = await Promise.allSettled([
-    fetchQuery(topicQuery, topics[0] ?? "Global News", apiKey),
-    fetchQuery(malaysiaQuery, "Malaysian Politics", apiKey),
-  ]);
-
-  const combined: RawArticle[] = [
-    ...(topicResults.status === "fulfilled" ? topicResults.value : []),
-    ...(malaysiaResults.status === "fulfilled" ? malaysiaResults.value : []),
-  ];
+  const combined: RawArticle[] = [];
+  for (const r of results) {
+    if (r.status === "fulfilled") combined.push(...r.value);
+  }
 
   // Deduplicate by URL
   const seen = new Set<string>();

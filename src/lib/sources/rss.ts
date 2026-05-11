@@ -20,7 +20,8 @@ function stripHtml(html: string): string {
 }
 
 function toExternalId(url: string): string {
-  return `rss-${Buffer.from(url).toString("base64").slice(0, 24)}`;
+  // Use the full URL (with special chars replaced) so IDs are always unique
+  return `rss-${url.replace(/[^a-zA-Z0-9]/g, "_")}`;
 }
 
 function deriveSourceUrl(feedUrl: string): string {
