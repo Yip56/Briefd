@@ -1,12 +1,75 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { ArticleCard } from "./ArticleCard";
 import { FilterBar } from "./FilterBar";
 import { DigestErrorBoundary } from "./DigestErrorBoundary";
 import { LoadingDots } from "@/components/ui/LoadingDots";
 import { useToast } from "@/components/ui/Toast";
 import type { DigestResult, ScoredArticle } from "@/lib/types";
+import { clsx } from "clsx";
+
+function formatDateHeader(): string {
+  const now = new Date();
+  const day = now.toLocaleDateString("en-MY", { weekday: "long" });
+  const date = now.toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" });
+  return `${day}, ${date} — Your Morning Briefing`;
+}
+
+const IMPACT_COLORS: Record<string, string> = {
+  high:   "bg-orange-50 text-orange-600 border border-orange-200",
+  medium: "bg-amber-50 text-amber-600 border border-amber-200",
+  low:    "bg-gray-50 text-gray-400 border border-gray-200",
+};
+
+function ArticleBlock({ article }: { article: ScoredArticle }) {
+  const isHigh = article.impactLevel === "high";
+
+  return (
+    <div className="py-5">
+      {/* Topic pill + impact badge */}
+      <div className="flex items-center gap-2 mb-2 flex-wrap">
+        {article.topic && (
+          <span className="px-2 py-0.5 rounded-full bg-brand-light text-brand text-[10px] font-semibold uppercase tracking-wide">
+            {article.topic}
+          </span>
+        )}
+        {isHigh && (
+          <span className={clsx("px-2 py-0.5 rounded-full text-[10px] font-semibold", IMPACT_COLORS.high)}>
+            High impact
+          </span>
+        )}
+      </div>
+
+      {/* Headline */}
+      <a
+        href={article.article_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block text-[16px] font-[500] text-gray-900 leading-snug hover:text-brand transition-colors mb-2"
+      >
+        {article.title}
+      </a>
+
+      {/* AI summary */}
+      <p className="text-[14px] text-gray-600 leading-[1.8] mb-3">
+        {article.aiSummary || article.summary}
+      </p>
+
+      {/* Source + read link */}
+      <div className="flex items-center gap-3 text-xs text-gray-400">
+        {article.source_name && <span>{article.source_name}</span>}
+        <a
+          href={article.article_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-brand transition-colors"
+        >
+          Read full article →
+        </a>
+      </div>
+    </div>
+  );
+}
 
 function DigestFeedInner() {
   const { showToast } = useToast();
@@ -18,21 +81,27 @@ function DigestFeedInner() {
   const [refreshing,  setRefreshing]  = useState(false);
 
   const fetchDigest = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else           setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      const res = await fetch("/api/digest");
+      const url = isRefresh ? `/api/digest?t=${Date.now()}` : "/api/digest";
+      const res = await fetch(url);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data: DigestResult = await res.json();
       setDigest(data);
       setActiveTopic(null);
       if (isRefresh) showToast("Digest refreshed", "success");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to load digest";
-      setError(msg);
-      if (isRefresh) showToast(msg, "error");
+    } catch {
+      if (isRefresh) {
+        showToast("Could not refresh — check your connection", "error");
+      } else {
+        setError("Failed to load digest");
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -97,38 +166,51 @@ function DigestFeedInner() {
   }
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="font-serif text-2xl text-gray-900">
-            {greeting()}, here&apos;s your digest
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">
+    <div className="max-w-2xl">
+      {/* Date header */}
+      <div className="mb-6">
+        <p className="text-xs text-gray-400 uppercase tracking-widest font-medium mb-1">
+          {formatDateHeader()}
+        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-300">
             {digest.totalScored} articles scored ·{" "}
             {new Date(digest.generatedAt).toLocaleTimeString("en-MY", {
               hour: "2-digit", minute: "2-digit",
             })}
           </p>
+          <button
+            onClick={() => fetchDigest(true)}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-brand transition-colors disabled:opacity-50"
+          >
+            {refreshing ? <LoadingDots /> : "↻ Refresh"}
+          </button>
         </div>
-        <button
-          onClick={() => fetchDigest(true)}
-          disabled={refreshing}
-          className="text-xs text-gray-400 hover:text-brand transition-colors disabled:opacity-50"
-        >
-          {refreshing ? "Refreshing…" : "↻ Refresh"}
-        </button>
       </div>
 
-      {/* Topic filter */}
-      <div className="mb-5">
+      {/* Minimal filter bar */}
+      <div className="mb-4">
         <FilterBar topics={uniqueTopics} activeTopic={activeTopic} onSelect={setActiveTopic} />
       </div>
 
-      {/* Articles */}
-      <div className="space-y-3">
-        {visible.map((article) => (
-          <ArticleCard key={article.id} article={article} />
+      {/* Refreshing overlay indicator */}
+      {refreshing && (
+        <div className="flex items-center gap-2 py-2 text-xs text-gray-400 mb-2">
+          <LoadingDots />
+          <span>Fetching latest articles…</span>
+        </div>
+      )}
+
+      {/* Articles — newspaper flowing style */}
+      <div>
+        {visible.map((article, i) => (
+          <div key={article.id}>
+            <ArticleBlock article={article} />
+            {i < visible.length - 1 && (
+              <hr className="border-t border-gray-100" />
+            )}
+          </div>
         ))}
       </div>
 
@@ -139,7 +221,7 @@ function DigestFeedInner() {
           disabled={refreshing}
           className="px-5 py-2 border border-gray-200 rounded-full text-sm text-gray-500 hover:border-brand hover:text-brand transition-all disabled:opacity-50"
         >
-          {refreshing ? "Refreshing digest…" : "Refresh digest"}
+          {refreshing ? <LoadingDots /> : "Refresh digest"}
         </button>
       </div>
     </div>
@@ -152,11 +234,4 @@ export function DigestFeed() {
       <DigestFeedInner />
     </DigestErrorBoundary>
   );
-}
-
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
 }

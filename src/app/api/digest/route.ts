@@ -4,7 +4,7 @@ import { fetchAllSources } from "@/lib/sources";
 import { buildDigest } from "@/lib/ai/digest";
 import type { VoteValue } from "@/lib/types";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const supabase = await createClient();

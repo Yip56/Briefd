@@ -35,6 +35,12 @@ function Select({
   );
 }
 
+function topicWeight(index: number): number {
+  if (index === 0) return 3.0;
+  if (index === 1) return 2.0;
+  return 1.0;
+}
+
 export function ProfileForm() {
   const router = useRouter();
 
@@ -44,8 +50,9 @@ export function ProfileForm() {
   const [lifeStage,  setLifeStage]  = useState("");
   const [vehicle,    setVehicle]    = useState("");
 
-  // Step 2 — topics
+  // Step 2 — topics + order
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [topicOrder,     setTopicOrder]     = useState<string[]>([]);
   const [keywords,       setKeywords]       = useState<string[]>([]);
 
   // Step 3 — schedule
@@ -58,8 +65,14 @@ export function ProfileForm() {
   const [error,   setError]   = useState<string | null>(null);
 
   function toggleTopic(topic: string) {
+    const isSelected = selectedTopics.includes(topic);
     setSelectedTopics((prev) =>
-      prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
+      isSelected ? prev.filter((t) => t !== topic) : [...prev, topic]
+    );
+    setTopicOrder((order) =>
+      isSelected
+        ? order.filter((t) => t !== topic)
+        : order.includes(topic) ? order : [...order, topic]
     );
   }
 
@@ -73,6 +86,18 @@ export function ProfileForm() {
     setLoading(true);
     setError(null);
     try {
+      // Build topic list: ordered presets (with weights) + keywords at weight 1
+      const orderedPresets = topicOrder.map((topic, i) => ({
+        topic,
+        weight: topicWeight(i),
+        is_preset: true,
+      }));
+      const keywordTopics = keywords.map((kw) => ({
+        topic: kw,
+        weight: 1.0,
+        is_preset: false,
+      }));
+
       const res = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -81,7 +106,7 @@ export function ProfileForm() {
           location,
           life_stage:            lifeStage,
           vehicle,
-          topics:                [...selectedTopics, ...keywords],
+          topics:                [...orderedPresets, ...keywordTopics],
           digest_time:           digestTime,
           digest_frequency:      digestFrequency,
           email_digest_enabled:  emailEnabled,
@@ -140,12 +165,19 @@ export function ProfileForm() {
         {step === 2 && (
           <div>
             <h2 className="font-serif text-xl text-gray-900 mb-4">What do you follow?</h2>
-            <TopicPicker selected={selectedTopics} onToggle={toggleTopic} />
-            <KeywordInput
-              keywords={keywords}
-              onAdd={(kw) => setKeywords((p) => [...p, kw])}
-              onRemove={(kw) => setKeywords((p) => p.filter((k) => k !== kw))}
+            <TopicPicker
+              selected={selectedTopics}
+              onToggle={toggleTopic}
+              topicOrder={topicOrder}
+              onReorder={setTopicOrder}
             />
+            <div className="mt-5">
+              <KeywordInput
+                keywords={keywords}
+                onAdd={(kw) => setKeywords((p) => [...p, kw])}
+                onRemove={(kw) => setKeywords((p) => p.filter((k) => k !== kw))}
+              />
+            </div>
           </div>
         )}
 

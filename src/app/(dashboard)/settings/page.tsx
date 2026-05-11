@@ -55,6 +55,12 @@ function ScoreRow({ pts, label, desc }: { pts: string; label: string; desc: stri
   );
 }
 
+function topicWeight(index: number): number {
+  if (index === 0) return 3.0;
+  if (index === 1) return 2.0;
+  return 1.0;
+}
+
 export default function SettingsPage() {
   const { showToast } = useToast();
 
@@ -65,6 +71,7 @@ export default function SettingsPage() {
   const [vehicle,     setVehicle]     = useState("");
 
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [topicOrder,     setTopicOrder]     = useState<string[]>([]);
   const [keywords,       setKeywords]       = useState<string[]>([]);
 
   const [digestTime,      setDigestTime]      = useState("08:00");
@@ -88,6 +95,7 @@ export default function SettingsPage() {
         setDigestFrequency(p?.digest_frequency ?? "daily");
         setEmailEnabled(p?.email_digest_enabled ?? true);
 
+        // Topics are returned sorted by weight desc (profile route orders by weight)
         const presets: string[] = [];
         const custom:  string[] = [];
         for (const t of topics ?? []) {
@@ -95,26 +103,44 @@ export default function SettingsPage() {
           else             custom.push(t.topic);
         }
         setSelectedTopics(presets);
+        setTopicOrder(presets); // already weight-sorted from API
         setKeywords(custom);
       })
       .finally(() => setLoading(false));
   }, []);
 
   function toggleTopic(topic: string) {
+    const isSelected = selectedTopics.includes(topic);
     setSelectedTopics((prev) =>
-      prev.includes(topic) ? prev.filter((t) => t !== topic) : [...prev, topic]
+      isSelected ? prev.filter((t) => t !== topic) : [...prev, topic]
+    );
+    setTopicOrder((order) =>
+      isSelected
+        ? order.filter((t) => t !== topic)
+        : order.includes(topic) ? order : [...order, topic]
     );
   }
 
   async function handleSave() {
     setSaving(true);
     try {
+      const orderedPresets = topicOrder.map((topic, i) => ({
+        topic,
+        weight: topicWeight(i),
+        is_preset: true,
+      }));
+      const keywordTopics = keywords.map((kw) => ({
+        topic: kw,
+        weight: 1.0,
+        is_preset: false,
+      }));
+
       const res = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           occupation, location, life_stage: lifeStage, vehicle,
-          topics: [...selectedTopics, ...keywords],
+          topics: [...orderedPresets, ...keywordTopics],
           digest_time: digestTime, digest_frequency: digestFrequency,
           email_digest_enabled: emailEnabled,
         }),
@@ -189,14 +215,21 @@ export default function SettingsPage() {
         )}
       </SectionCard>
 
-      {/* Topics */}
+      {/* Topics with drag-to-rank */}
       <SectionCard title="Topics & keywords">
-        <TopicPicker selected={selectedTopics} onToggle={toggleTopic} />
-        <KeywordInput
-          keywords={keywords}
-          onAdd={(kw) => setKeywords((p) => [...p, kw])}
-          onRemove={(kw) => setKeywords((p) => p.filter((k) => k !== kw))}
+        <TopicPicker
+          selected={selectedTopics}
+          onToggle={toggleTopic}
+          topicOrder={topicOrder}
+          onReorder={setTopicOrder}
         />
+        <div className="mt-5">
+          <KeywordInput
+            keywords={keywords}
+            onAdd={(kw) => setKeywords((p) => [...p, kw])}
+            onRemove={(kw) => setKeywords((p) => p.filter((k) => k !== kw))}
+          />
+        </div>
       </SectionCard>
 
       {/* Profile */}
@@ -214,7 +247,7 @@ export default function SettingsPage() {
         <h2 className="font-serif text-lg text-brand mb-4">How Briefd ranks your news</h2>
         <div className="space-y-2.5 text-sm">
           <ScoreRow pts={`${SCORING_WEIGHTS.recency} pts`}      label="Recency"       desc="Articles from the last 6 hours score highest; older content tapers off." />
-          <ScoreRow pts={`${SCORING_WEIGHTS.topicMatch} pts`}   label="Topic match"   desc="Exact topic matches score full points; partial keyword overlaps score half." />
+          <ScoreRow pts={`${SCORING_WEIGHTS.topicMatch} pts`}   label="Topic match"   desc="Exact topic matches score full points × your topic rank weight (3×, 2×, or 1×)." />
           <ScoreRow pts={`${SCORING_WEIGHTS.profileMatch} pts`} label="Profile match" desc="Your occupation, vehicle, and life stage boost relevant articles automatically." />
           <ScoreRow pts={`${SCORING_WEIGHTS.keywordMatch} pts`} label="Keywords"      desc="Custom keywords found in the title or body add points per match." />
           <ScoreRow pts="+10 / −20"                             label="Your feedback" desc="Thumbs up adds 10 pts to similar articles; thumbs down removes 20." />

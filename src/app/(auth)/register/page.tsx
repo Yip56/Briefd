@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { createUserProfile } from "@/lib/supabase/actions";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -38,23 +40,49 @@ export default function RegisterPage() {
       return;
     }
 
-    // Create the profile row immediately so downstream queries never miss it
     if (data.user) {
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        email: data.user.email!,
-      });
-
-      // Non-fatal: profile may already exist if the trigger fires first
-      if (profileError && profileError.code !== "23505") {
-        setError("Account created but profile setup failed. Please contact support.");
+      const { error: profileError } = await createUserProfile(
+        data.user.id,
+        data.user.email!
+      );
+      if (profileError) {
+        setError(`Account created but profile setup failed: ${profileError}`);
         setLoading(false);
+        return;
+      }
+
+      // If email confirmation is disabled, a session is returned immediately
+      if (data.session) {
+        router.push("/");
+        router.refresh();
         return;
       }
     }
 
-    router.push("/");
-    router.refresh();
+    setLoading(false);
+    setConfirmed(true);
+  }
+
+  if (confirmed) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-sm text-center">
+          <span className="text-3xl font-bold tracking-tight text-[#1D5C3A]">Briefd</span>
+          <div className="mt-8 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+            <div className="text-4xl mb-4">📬</div>
+            <h1 className="text-xl font-semibold text-gray-900 mb-3">Check your email</h1>
+            <p className="text-sm text-gray-500">
+              We sent a confirmation link to <strong className="text-gray-800">{email}</strong>.
+              Click the link to activate your account, then{" "}
+              <Link href="/login" className="text-[#1D5C3A] font-medium hover:underline">
+                sign in
+              </Link>
+              .
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
