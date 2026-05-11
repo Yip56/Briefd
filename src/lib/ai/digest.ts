@@ -107,10 +107,8 @@ export async function buildDigest(
           topic: article.topic ?? "",
           publishedAt: article.published_at ?? new Date().toISOString(),
         };
-        const [aiSummary, impactAnalysis] = await Promise.all([
-          summariseArticle(raw, preferences.profile),
-          getImpactAnalysis(raw, preferences.profile, geminiProfile || undefined),
-        ]);
+        const aiSummary     = await summariseArticle(raw, preferences.profile);
+        const impactAnalysis = await getImpactAnalysis(raw, preferences.profile, geminiProfile || undefined);
         return { ...article, aiSummary, impactAnalysis };
       }
   );

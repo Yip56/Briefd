@@ -21,9 +21,18 @@ async function callGemini(prompt: string): Promise<string> {
     }),
   });
 
-  if (!res.ok) return "";
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(`[Gemini] HTTP ${res.status}:`, body.slice(0, 200));
+    return "";
+  }
   const data = await res.json();
-  return (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const finishReason = data?.candidates?.[0]?.finishReason;
+  if (!text && finishReason && finishReason !== "STOP") {
+    console.error("[Gemini] No text, finishReason:", finishReason);
+  }
+  return (text ?? "").trim();
 }
 
 export async function summariseArticle(

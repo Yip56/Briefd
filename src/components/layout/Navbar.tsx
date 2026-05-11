@@ -44,6 +44,7 @@ export function Navbar() {
         {/* Nav links */}
         <div className="flex items-center gap-5">
           {navLink("/", "Today")}
+          {navLink("/archive", "Archive")}
           {navLink("/algorithm", "My Algorithm")}
           {navLink("/settings", "Settings")}
           <button
