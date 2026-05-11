@@ -1,63 +1,66 @@
 import { SCORING_WEIGHTS } from "@/lib/constants";
-import type { RawArticle, ScoredArticle, UserPreferences, ImpactLevel, VoteValue } from "@/lib/types";
+import type { RawArticle, ScoredArticle, UserPreferences, ImpactLevel, VoteValue, UserTopic, UserAlgorithmSettings } from "@/lib/types";
 
 const HIGH_IMPACT_WORDS = [
   "subsidy", "price hike", "interest rate", "opr", "epf", "tax",
   "layoff", "ban", "mandatory", "emergency",
 ];
 
-const TOP_N = 15;
+const TOP_N = 50;
 
-// ─── Recency ─────────────────────────────────────────────────────────────────
-
-function recencyScore(publishedAt: string): number {
+function recencyScore(publishedAt: string, recencyWeight: number): number {
   const ageMs = Date.now() - new Date(publishedAt).getTime();
   const h = ageMs / 3_600_000;
-  if (h <= 6)  return SCORING_WEIGHTS.recency;       // 40
-  if (h <= 24) return 30;
-  if (h <= 72) return 15;
-  return 5;
+  const scale = recencyWeight / SCORING_WEIGHTS.recency; // relative to default 40
+  if (h <= 6)  return Math.round(recencyWeight * scale);
+  if (h <= 24) return Math.round(30 * scale);
+  if (h <= 72) return Math.round(15 * scale);
+  return Math.round(5 * scale);
 }
 
-// ─── Topic match ─────────────────────────────────────────────────────────────
-
-function topicMatchScore(articleTopic: string, userTopics: string[]): number {
+function topicMatchScore(articleTopic: string, userTopics: UserTopic[], topicWeight: number): number {
   const at = articleTopic.toLowerCase();
   for (const ut of userTopics) {
-    if (ut.toLowerCase() === at) return SCORING_WEIGHTS.topicMatch; // 30
-    // partial: at least one word in common
-    const utWords = ut.toLowerCase().split(/\s+/);
-    if (utWords.some((w) => w.length > 3 && at.includes(w))) return 15;
+    const tl = ut.topic.toLowerCase();
+    let base = 0;
+    if (tl === at) {
+      base = topicWeight;
+    } else {
+      const utWords = tl.split(/\s+/);
+      if (utWords.some((w) => w.length > 3 && at.includes(w))) base = Math.round(topicWeight * 0.5);
+    }
+    if (base > 0) {
+      const weight = ut.weight ?? 1.0;
+      return base * weight;
+    }
   }
   return 0;
 }
 
-// ─── Profile match ────────────────────────────────────────────────────────────
-
-function profileMatchScore(article: RawArticle, profile: UserPreferences["profile"]): number {
+function profileMatchScore(
+  article: RawArticle,
+  profile: UserPreferences["profile"],
+  impactWeight: number
+): number {
   const topic = article.topic.toLowerCase();
   const text  = `${article.title} ${article.summary}`.toLowerCase();
-  const w     = SCORING_WEIGHTS.profileMatch; // 25
+  const w     = Math.round(SCORING_WEIGHTS.profileMatch * (impactWeight / 50));
 
-  // Vehicle → fuel/transport
   if (
     (profile.vehicle === "Car owner" || profile.vehicle === "Both") &&
     (topic.includes("fuel") || topic.includes("transport") || text.includes("petrol") || text.includes("ron95"))
   ) return w;
 
-  // Student / fresh grad → jobs
   if (
     (profile.occupation === "Student" || profile.occupation === "Fresh Graduate") &&
     (topic.includes("job") || topic.includes("career") || text.includes("graduate") || text.includes("internship"))
   ) return w;
 
-  // Business owner / investor → finance/economy
   if (
     (profile.occupation === "Business Owner" || profile.occupation === "Investor") &&
     (topic.includes("finance") || topic.includes("economy") || topic.includes("investing") || text.includes("ringgit"))
   ) return w;
 
-  // Renting / looking to buy → property
   if (
     (profile.life_stage === "Renting" || profile.life_stage === "Looking to buy property") &&
     (topic.includes("property") || text.includes("rent") || text.includes("house price") || text.includes("mortgage"))
@@ -66,29 +69,43 @@ function profileMatchScore(article: RawArticle, profile: UserPreferences["profil
   return 0;
 }
 
-// ─── Keyword match ────────────────────────────────────────────────────────────
-
-function keywordMatchScore(article: RawArticle, userTopics: string[]): number {
-  // Custom / non-preset topics act as keyword searches
+function keywordMatchScore(article: RawArticle, userTopics: UserTopic[], keywordWeight: number): number {
   const text = `${article.title} ${article.summary}`.toLowerCase();
   let pts = 0;
-  for (const keyword of userTopics) {
-    if (text.includes(keyword.toLowerCase())) {
-      pts += SCORING_WEIGHTS.keywordMatch; // 15 per match
+  for (const ut of userTopics) {
+    if (text.includes(ut.topic.toLowerCase())) {
+      pts += keywordWeight;
     }
   }
   return pts;
 }
 
-// ─── Vote feedback ────────────────────────────────────────────────────────────
-
-function voteFeedbackScore(externalId: string, feedbackMap: Record<string, VoteValue>): number {
+function voteFeedbackScore(
+  externalId: string,
+  feedbackMap: Record<string, VoteValue>,
+  upWeight: number,
+  downPenalty: number
+): number {
   const vote = feedbackMap[externalId];
   if (!vote) return 0;
-  return vote === "up" ? SCORING_WEIGHTS.voteFeedback.up : SCORING_WEIGHTS.voteFeedback.down;
+  return vote === "up" ? upWeight : -downPenalty;
 }
 
-// ─── Impact level ─────────────────────────────────────────────────────────────
+function customKeywordScore(
+  article: RawArticle,
+  customKeywords: Array<{ keyword: string; points: number }>,
+  avoidanceKeywords: Array<{ keyword: string; points: number }>
+): number {
+  const text = `${article.title} ${article.summary}`.toLowerCase();
+  let pts = 0;
+  for (const kw of customKeywords) {
+    if (text.includes(kw.keyword.toLowerCase())) pts += kw.points;
+  }
+  for (const kw of avoidanceKeywords) {
+    if (text.includes(kw.keyword.toLowerCase())) pts -= kw.points;
+  }
+  return pts;
+}
 
 function deriveImpactLevel(score: number, title: string): ImpactLevel {
   const lower = title.toLowerCase();
@@ -97,28 +114,41 @@ function deriveImpactLevel(score: number, title: string): ImpactLevel {
   return "low";
 }
 
-// ─── Main export ─────────────────────────────────────────────────────────────
-
 export function scoreArticles(
   articles: RawArticle[],
   preferences: UserPreferences,
-  feedbackMap: Record<string, VoteValue>
+  feedbackMap: Record<string, VoteValue>,
+  algorithmSettings?: UserAlgorithmSettings | null,
+  clickedArticleUrls?: Set<string>
 ): ScoredArticle[] {
-  const userTopicNames = preferences.topics.map((t) => t.topic);
+  const userTopics = preferences.topics;
   const now = new Date().toISOString();
 
+  const impactWeight   = algorithmSettings?.impact_weight   ?? 50;
+  const topicWeight    = algorithmSettings?.topic_weight    ?? SCORING_WEIGHTS.topicMatch;
+  const recencyWeight  = algorithmSettings?.recency_weight  ?? SCORING_WEIGHTS.recency;
+  const keywordWeight  = algorithmSettings?.keyword_weight  ?? SCORING_WEIGHTS.keywordMatch;
+  const feedbackUp     = algorithmSettings?.feedback_weight ?? SCORING_WEIGHTS.voteFeedback.up;
+  const feedbackDown   = algorithmSettings?.feedback_penalty ?? Math.abs(SCORING_WEIGHTS.voteFeedback.down);
+  const clickBonus     = algorithmSettings?.click_read_bonus ?? 8;
+  const customKeywords = algorithmSettings?.custom_keywords  ?? [];
+  const avoidanceKeywords = algorithmSettings?.avoidance_keywords ?? [];
+
   const scored = articles.map((raw): ScoredArticle & { _score: number } => {
+    const clickBonusPoints = clickedArticleUrls?.has(raw.articleUrl) ? clickBonus : 0;
+
     const score =
-      recencyScore(raw.publishedAt) +
-      topicMatchScore(raw.topic, userTopicNames) +
-      profileMatchScore(raw, preferences.profile) +
-      keywordMatchScore(raw, userTopicNames) +
-      voteFeedbackScore(raw.externalId, feedbackMap);
+      recencyScore(raw.publishedAt, recencyWeight) +
+      topicMatchScore(raw.topic, userTopics, topicWeight) +
+      profileMatchScore(raw, preferences.profile, impactWeight) +
+      keywordMatchScore(raw, userTopics, keywordWeight) +
+      voteFeedbackScore(raw.externalId, feedbackMap, feedbackUp, feedbackDown) +
+      customKeywordScore(raw, customKeywords, avoidanceKeywords) +
+      clickBonusPoints;
 
     const impactLevel = deriveImpactLevel(score, raw.title);
 
     return {
-      // Article (DB shape) fields
       id: raw.externalId,
       external_id: raw.externalId,
       title: raw.title,
@@ -129,12 +159,10 @@ export function scoreArticles(
       topic: raw.topic,
       published_at: raw.publishedAt,
       fetched_at: now,
-      // ScoredArticle extras
       relevanceScore: Math.max(0, score),
       impactLevel,
       aiSummary: raw.summary.slice(0, 200),
       userVote: feedbackMap[raw.externalId] ?? null,
-      // Temporary sort key (stripped before return)
       _score: score,
     };
   });

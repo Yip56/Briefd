@@ -80,6 +80,9 @@ ALTER TABLE article_feedback ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "profiles_select_own" ON profiles
   FOR SELECT USING (auth.uid() = id);
 
+CREATE POLICY "profiles_insert_own" ON profiles
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 CREATE POLICY "profiles_update_own" ON profiles
   FOR UPDATE USING (auth.uid() = id);
 
@@ -112,6 +115,71 @@ CREATE POLICY "article_feedback_update_own" ON article_feedback
 
 CREATE POLICY "article_feedback_delete_own" ON article_feedback
   FOR DELETE USING (auth.uid() = user_id);
+
+-- Digest archives — snapshot of old digest_entries before refresh
+CREATE TABLE digest_archives (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  archived_at TIMESTAMPTZ DEFAULT NOW(),
+  articles JSONB NOT NULL,
+  label TEXT
+);
+
+-- Per-user algorithm customisation
+CREATE TABLE user_algorithm_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
+  impact_weight INT DEFAULT 50,
+  topic_weight INT DEFAULT 30,
+  recency_weight INT DEFAULT 40,
+  keyword_weight INT DEFAULT 15,
+  feedback_weight INT DEFAULT 10,
+  feedback_penalty INT DEFAULT 20,
+  click_read_bonus INT DEFAULT 8,
+  custom_keywords JSONB DEFAULT '[]',
+  avoidance_keywords JSONB DEFAULT '[]',
+  gemini_profile TEXT DEFAULT '',
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Article click tracking
+CREATE TABLE article_clicks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  article_url TEXT NOT NULL,
+  clicked_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, article_url)
+);
+
+-- Extend article_feedback with reason fields
+ALTER TABLE article_feedback ADD COLUMN IF NOT EXISTS reason TEXT;
+ALTER TABLE article_feedback ADD COLUMN IF NOT EXISTS free_text TEXT;
+
+-- RLS for new tables
+ALTER TABLE digest_archives ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_algorithm_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE article_clicks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "digest_archives_select_own" ON digest_archives
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "digest_archives_insert_own" ON digest_archives
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "user_algorithm_settings_select_own" ON user_algorithm_settings
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "user_algorithm_settings_insert_own" ON user_algorithm_settings
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "user_algorithm_settings_update_own" ON user_algorithm_settings
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "article_clicks_select_own" ON article_clicks
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "article_clicks_insert_own" ON article_clicks
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- ─── Updated-at trigger ───────────────────────────────────────────────────────
 

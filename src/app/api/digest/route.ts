@@ -12,20 +12,54 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // ── 1. Fetch user profile + topics ──────────────────────────────────────────
-  const [profileResult, topicsResult] = await Promise.all([
+  const [profileResult, topicsResult, algoResult, clicksResult] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase.from("user_topics").select("*").eq("user_id", user.id),
+    supabase.from("user_algorithm_settings").select("*").eq("user_id", user.id).maybeSingle(),
+    supabase.from("article_clicks").select("article_url").eq("user_id", user.id),
   ]);
 
   if (profileResult.error || !profileResult.data) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
   }
 
-  const profile = profileResult.data;
-  const topics  = topicsResult.data ?? [];
+  const profile          = profileResult.data;
+  const topics           = topicsResult.data ?? [];
+  const algorithmSettings = algoResult.data ?? null;
+  const clickedUrls      = new Set((clicksResult.data ?? []).map((r) => r.article_url));
 
-  // ── 2. Build feedbackMap from prior votes ────────────────────────────────────
+  // ── Archive existing digest_entries before building new ones ─────────────────
+  const { data: existingEntries } = await supabase
+    .from("digest_entries")
+    .select("article_id, relevance_score, impact_level, ai_summary, shown_at, articles(*)")
+    .eq("user_id", user.id);
+
+  if (existingEntries && existingEntries.length > 0) {
+    const today = new Date().toLocaleDateString("en-MY", {
+      weekday: "long", day: "numeric", month: "long",
+    });
+    const label = `${today} — ${existingEntries.length} articles`;
+
+    const archiveArticles = existingEntries.map((e) => {
+      const art = e.articles as unknown as Record<string, unknown> | null;
+      return {
+        ...(art ?? {}),
+        relevanceScore: e.relevance_score,
+        impactLevel:    e.impact_level,
+        aiSummary:      e.ai_summary ?? "",
+      };
+    });
+
+    await supabase.from("digest_archives").insert({
+      user_id:    user.id,
+      articles:   archiveArticles,
+      label,
+    });
+
+    await supabase.from("digest_entries").delete().eq("user_id", user.id);
+  }
+
+  // ── Build feedbackMap from prior votes ───────────────────────────────────────
   const { data: feedbackRows } = await supabase
     .from("article_feedback")
     .select("vote, articles(external_id)")
@@ -39,15 +73,15 @@ export async function GET() {
     }
   }
 
-  // ── 3. Fetch articles from all sources ───────────────────────────────────────
-  const topicNames = topics.map((t) => t.topic);
+  // ── Fetch articles from all sources ─────────────────────────────────────────
+  const topicNames  = topics.map((t) => t.topic);
   const rawArticles = await fetchAllSources(topicNames);
 
-  // ── 4. Score + AI-summarise ──────────────────────────────────────────────────
+  // ── Score + AI-summarise ─────────────────────────────────────────────────────
   const preferences = { profile, topics };
-  const digest = await buildDigest(rawArticles, preferences, feedbackMap);
+  const digest = await buildDigest(rawArticles, preferences, feedbackMap, algorithmSettings, clickedUrls);
 
-  // ── 5. Persist: upsert articles then digest_entries ──────────────────────────
+  // ── Persist: upsert articles then digest_entries ─────────────────────────────
   if (digest.articles.length > 0) {
     const articleRows = digest.articles.map((a) => ({
       external_id:  a.external_id,
@@ -65,7 +99,6 @@ export async function GET() {
       .upsert(articleRows, { onConflict: "external_id", ignoreDuplicates: false })
       .select("id, external_id");
 
-    // Map external_id → DB uuid
     const idMap = new Map<string, string>();
     for (const row of upsertedArticles ?? []) {
       if (row.external_id) idMap.set(row.external_id, row.id);

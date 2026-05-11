@@ -2,98 +2,146 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { FilterBar } from "./FilterBar";
+import { ArticleCard } from "./ArticleCard";
 import { DigestErrorBoundary } from "./DigestErrorBoundary";
 import { LoadingDots } from "@/components/ui/LoadingDots";
 import { useToast } from "@/components/ui/Toast";
-import type { DigestResult, ScoredArticle } from "@/lib/types";
-import { clsx } from "clsx";
+import type { DigestResult, ScoredArticle, DigestArchive } from "@/lib/types";
 
 function formatDateHeader(): string {
-  const now = new Date();
-  const day = now.toLocaleDateString("en-MY", { weekday: "long" });
+  const now  = new Date();
+  const day  = now.toLocaleDateString("en-MY", { weekday: "long" });
   const date = now.toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" });
   return `${day}, ${date} — Your Morning Briefing`;
 }
 
-const IMPACT_COLORS: Record<string, string> = {
-  high:   "bg-orange-50 text-orange-600 border border-orange-200",
-  medium: "bg-amber-50 text-amber-600 border border-amber-200",
-  low:    "bg-gray-50 text-gray-400 border border-gray-200",
-};
+// ─── Archive section ──────────────────────────────────────────────────────────
 
-function ArticleBlock({ article }: { article: ScoredArticle }) {
-  const isHigh = article.impactLevel === "high";
-
+function ArchiveArticleRow({ article }: { article: ScoredArticle }) {
   return (
-    <div className="py-5">
-      {/* Topic pill + impact badge */}
-      <div className="flex items-center gap-2 mb-2 flex-wrap">
-        {article.topic && (
-          <span className="px-2 py-0.5 rounded-full bg-brand-light text-brand text-[10px] font-semibold uppercase tracking-wide">
-            {article.topic}
-          </span>
-        )}
-        {isHigh && (
-          <span className={clsx("px-2 py-0.5 rounded-full text-[10px] font-semibold", IMPACT_COLORS.high)}>
-            High impact
-          </span>
-        )}
-      </div>
-
-      {/* Headline */}
+    <div className="py-3 border-b border-gray-50 last:border-0">
       <a
         href={article.article_url}
         target="_blank"
         rel="noopener noreferrer"
-        className="block text-[16px] font-[500] text-gray-900 leading-snug hover:text-brand transition-colors mb-2"
+        className="text-[14px] font-medium text-gray-800 hover:text-brand transition-colors block leading-snug mb-1"
       >
         {article.title}
       </a>
-
-      {/* AI summary */}
-      <p className="text-[14px] text-gray-600 leading-[1.8] mb-3">
-        {article.aiSummary || article.summary}
+      <p className="text-[12px] text-gray-400 line-clamp-2 leading-relaxed">
+        {(article as ScoredArticle & { aiSummary?: string }).aiSummary || article.summary}
       </p>
-
-      {/* Source + read link */}
-      <div className="flex items-center gap-3 text-xs text-gray-400">
-        {article.source_name && <span>{article.source_name}</span>}
-        <a
-          href={article.article_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-brand transition-colors"
-        >
-          Read full article →
-        </a>
-      </div>
+      {article.topic && (
+        <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-brand-light text-brand text-[10px] font-semibold uppercase tracking-wide">
+          {article.topic}
+        </span>
+      )}
     </div>
   );
 }
 
+function ArchiveEntry({ archive }: { archive: DigestArchive }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border border-gray-100 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+      >
+        <span className="text-sm text-gray-700 font-medium">{archive.label ?? archive.archived_at}</span>
+        <span className="text-gray-400 text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="px-4 pb-3">
+          {archive.articles.map((a, i) => (
+            <ArchiveArticleRow key={a.id ?? i} article={a} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArchiveSection() {
+  const [open,     setOpen]     = useState(false);
+  const [archives, setArchives] = useState<DigestArchive[]>([]);
+  const [loading,  setLoading]  = useState(false);
+  const [fetched,  setFetched]  = useState(false);
+
+  async function load() {
+    if (fetched) return;
+    setLoading(true);
+    try {
+      const res  = await fetch("/api/archives");
+      const data = await res.json();
+      setArchives(Array.isArray(data) ? data : []);
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false);
+      setFetched(true);
+    }
+  }
+
+  function handleToggle() {
+    const next = !open;
+    setOpen(next);
+    if (next) load();
+  }
+
+  return (
+    <div className="mt-10">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="text-sm text-gray-400 hover:text-brand transition-colors"
+      >
+        {open ? "Hide past digests ↑" : "View past digests ↓"}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2">
+          {loading && (
+            <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+              <LoadingDots /> Loading…
+            </div>
+          )}
+          {!loading && archives.length === 0 && (
+            <p className="text-sm text-gray-400 py-2">No past digests yet.</p>
+          )}
+          {archives.map((a) => (
+            <ArchiveEntry key={a.id} archive={a} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main feed ────────────────────────────────────────────────────────────────
+
 function DigestFeedInner() {
   const { showToast } = useToast();
 
-  const [digest,      setDigest]      = useState<DigestResult | null>(null);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState<string | null>(null);
-  const [activeTopic, setActiveTopic] = useState<string | null>(null);
-  const [refreshing,  setRefreshing]  = useState(false);
+  const [digest,       setDigest]       = useState<DigestResult | null>(null);
+  const [articles,     setArticles]     = useState<ScoredArticle[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
+  const [activeTopic,  setActiveTopic]  = useState<string | null>(null);
+  const [refreshing,   setRefreshing]   = useState(false);
 
   const fetchDigest = useCallback(async (isRefresh = false) => {
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     setError(null);
 
     try {
       const url = isRefresh ? `/api/digest?t=${Date.now()}` : "/api/digest";
-      const res = await fetch(url);
+      const res  = await fetch(url);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data: DigestResult = await res.json();
       setDigest(data);
+      setArticles(data.articles);
       setActiveTopic(null);
       if (isRefresh) showToast("Digest refreshed", "success");
     } catch {
@@ -110,15 +158,17 @@ function DigestFeedInner() {
 
   useEffect(() => { fetchDigest(); }, [fetchDigest]);
 
-  const uniqueTopics = digest
-    ? [...new Set(digest.articles.map((a) => a.topic).filter(Boolean))] as string[]
+  function removeArticle(id: string) {
+    setArticles((prev) => prev.filter((a) => a.id !== id));
+  }
+
+  const uniqueTopics = articles.length > 0
+    ? [...new Set(articles.map((a) => a.topic).filter(Boolean))] as string[]
     : [];
 
-  const visible: ScoredArticle[] = digest
-    ? activeTopic
-      ? digest.articles.filter((a) => a.topic === activeTopic)
-      : digest.articles
-    : [];
+  const visible = activeTopic
+    ? articles.filter((a) => a.topic === activeTopic)
+    : articles;
 
   if (loading) {
     return (
@@ -145,7 +195,7 @@ function DigestFeedInner() {
     );
   }
 
-  if (!digest || digest.articles.length === 0) {
+  if (!digest || articles.length === 0) {
     return (
       <div className="text-center py-20">
         <div className="text-4xl mb-4">📭</div>
@@ -189,12 +239,12 @@ function DigestFeedInner() {
         </div>
       </div>
 
-      {/* Minimal filter bar */}
+      {/* Filter bar */}
       <div className="mb-4">
         <FilterBar topics={uniqueTopics} activeTopic={activeTopic} onSelect={setActiveTopic} />
       </div>
 
-      {/* Refreshing overlay indicator */}
+      {/* Refreshing indicator */}
       {refreshing && (
         <div className="flex items-center gap-2 py-2 text-xs text-gray-400 mb-2">
           <LoadingDots />
@@ -202,14 +252,12 @@ function DigestFeedInner() {
         </div>
       )}
 
-      {/* Articles — newspaper flowing style */}
+      {/* Articles */}
       <div>
         {visible.map((article, i) => (
           <div key={article.id}>
-            <ArticleBlock article={article} />
-            {i < visible.length - 1 && (
-              <hr className="border-t border-gray-100" />
-            )}
+            <ArticleCard article={article} onRemove={removeArticle} />
+            {i < visible.length - 1 && <hr className="border-t border-gray-100" />}
           </div>
         ))}
       </div>
@@ -224,6 +272,9 @@ function DigestFeedInner() {
           {refreshing ? <LoadingDots /> : "Refresh digest"}
         </button>
       </div>
+
+      {/* Archive accordion */}
+      <ArchiveSection />
     </div>
   );
 }

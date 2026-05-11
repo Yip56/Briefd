@@ -93,6 +93,7 @@ export interface ScoredArticle extends Article {
   relevanceScore: number
   impactLevel: ImpactLevel
   aiSummary: string
+  impactAnalysis?: string
   userVote?: VoteValue | null
 }
 
@@ -105,4 +106,28 @@ export interface DigestResult {
   articles: ScoredArticle[]
   generatedAt: string
   totalScored: number
+}
+
+export interface UserAlgorithmSettings {
+  id: string
+  user_id: string
+  impact_weight: number
+  topic_weight: number
+  recency_weight: number
+  keyword_weight: number
+  feedback_weight: number
+  feedback_penalty: number
+  click_read_bonus: number
+  custom_keywords: Array<{ keyword: string; points: number }>
+  avoidance_keywords: Array<{ keyword: string; points: number }>
+  gemini_profile: string
+  updated_at: string
+}
+
+export interface DigestArchive {
+  id: string
+  user_id: string
+  archived_at: string
+  articles: ScoredArticle[]
+  label: string | null
 }
