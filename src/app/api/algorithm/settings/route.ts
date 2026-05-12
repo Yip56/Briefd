@@ -29,6 +29,7 @@ export async function GET() {
     custom_keywords:    [],
     avoidance_keywords: [],
     gemini_profile:     "",
+    topic_composition:  {},
   };
 
   return NextResponse.json(data ?? defaults);

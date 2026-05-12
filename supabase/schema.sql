@@ -15,7 +15,7 @@ CREATE TABLE profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Topics the user has selected (preset or custom keyword)
+-- Topics the user has selected (preset o~r custom keyword)
 CREATE TABLE user_topics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
@@ -73,8 +73,19 @@ CREATE TABLE email_log (
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_topics ENABLE ROW LEVEL SECURITY;
+ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE digest_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE article_feedback ENABLE ROW LEVEL SECURITY;
+
+-- articles: shared public data, any authenticated user can read/write
+CREATE POLICY "articles_select_authenticated" ON articles
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "articles_insert_authenticated" ON articles
+  FOR INSERT TO authenticated WITH CHECK (true);
+
+CREATE POLICY "articles_update_authenticated" ON articles
+  FOR UPDATE TO authenticated USING (true);
 
 -- profiles: users can only read/update their own row
 CREATE POLICY "profiles_select_own" ON profiles
@@ -194,3 +205,89 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER profiles_updated_at
   BEFORE UPDATE ON profiles
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ─── Article queue: persistent scored queue, serves paginated digests ─────────
+
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS ai_summary TEXT;
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS impact_analysis TEXT;
+
+CREATE TABLE IF NOT EXISTS article_queue (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  article_id UUID REFERENCES articles(id) ON DELETE CASCADE,
+  relevance_score FLOAT DEFAULT 0,
+  impact_level TEXT DEFAULT 'medium',
+  ai_summary TEXT,
+  impact_analysis TEXT,
+  topic TEXT,
+  position INT,
+  served BOOLEAN DEFAULT false,
+  served_at TIMESTAMPTZ,
+  queued_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_article_queue_user
+  ON article_queue(user_id, served, position);
+
+ALTER TABLE article_queue ENABLE ROW LEVEL SECURITY;
+
+-- ─── Video flag on articles ───────────────────────────────────────────────────
+
+ALTER TABLE articles ADD COLUMN IF NOT EXISTS is_video BOOLEAN DEFAULT false;
+
+-- ─── Topic composition on algorithm settings ──────────────────────────────────
+
+ALTER TABLE user_algorithm_settings
+  ADD COLUMN IF NOT EXISTS topic_composition JSONB DEFAULT '{}';
+
+-- ─── Gemini API call tracking ─────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS gemini_usage (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  call_type        TEXT NOT NULL,
+  tokens_used      INT DEFAULT 0,
+  model            TEXT DEFAULT 'gemini-2.0-flash',
+  called_at        TIMESTAMPTZ DEFAULT NOW(),
+  digest_session_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS gemini_daily_budget (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
+  date        DATE DEFAULT CURRENT_DATE,
+  calls_used  INT DEFAULT 0,
+  calls_limit INT DEFAULT 25,
+  last_reset  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE gemini_usage ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gemini_daily_budget ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "gemini_usage_select_own" ON gemini_usage
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "gemini_usage_insert_own" ON gemini_usage
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "gemini_daily_budget_select_own" ON gemini_daily_budget
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "gemini_daily_budget_insert_own" ON gemini_daily_budget
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "gemini_daily_budget_update_own" ON gemini_daily_budget
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "article_queue_select_own" ON article_queue
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "article_queue_insert_own" ON article_queue
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "article_queue_update_own" ON article_queue
+  FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "article_queue_delete_own" ON article_queue
+  FOR DELETE USING (auth.uid() = user_id);
+

@@ -40,6 +40,7 @@ export interface Article {
   topic: string | null
   published_at: string | null
   fetched_at: string
+  is_video?: boolean
 }
 
 export interface DigestEntry {
@@ -79,6 +80,7 @@ export interface RawArticle {
   articleUrl: string
   topic: string
   publishedAt: string
+  isVideo?: boolean
 }
 
 export interface RssFeed {
@@ -102,11 +104,21 @@ export interface UserPreferences {
   topics: UserTopic[]
 }
 
+export interface QueueStats {
+  totalQueued: number
+  totalServed: number
+  totalRemaining: number
+  nextRefreshAvailable: boolean
+  currentStart: number
+  currentEnd: number
+}
+
 export interface DigestResult {
   articles: ScoredArticle[]
   generatedAt: string
   totalScored: number
   geminiQuotaRetryAfter?: string | null
+  queueStats?: QueueStats
 }
 
 export interface UserAlgorithmSettings {
@@ -122,6 +134,7 @@ export interface UserAlgorithmSettings {
   custom_keywords: Array<{ keyword: string; points: number }>
   avoidance_keywords: Array<{ keyword: string; points: number }>
   gemini_profile: string
+  topic_composition: Record<string, number>
   updated_at: string
 }
 

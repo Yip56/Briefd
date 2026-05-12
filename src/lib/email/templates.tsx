@@ -6,54 +6,63 @@ const BG    = "#F5F3EE";
 
 const IMPACT: Record<string, { bg: string; color: string; label: string }> = {
   high:   { bg: "#FEF3C7", color: "#92400E", label: "⚡ High impact" },
-  medium: { bg: "#F3F4F6", color: "#6B7280", label: "Medium"         },
-  low:    { bg: "#F3F4F6", color: "#9CA3AF", label: "Low"            },
+  medium: { bg: "#F3F4F6", color: "#6B7280", label: "Medium"        },
+  low:    { bg: "#F3F4F6", color: "#9CA3AF", label: "Low"           },
 };
 
-function articleRow(a: ScoredArticle): string {
+function isVideoArticle(a: ScoredArticle): boolean {
+  return a.is_video === true || (a.external_id ?? "").startsWith("yt_");
+}
+
+function articleRow(a: ScoredArticle, index: number): string {
   const imp     = IMPACT[a.impactLevel] ?? IMPACT.medium;
   const pubDate = a.published_at
     ? new Date(a.published_at).toLocaleDateString("en-MY", { day: "numeric", month: "short" })
     : "";
-  const base    = `${APP_URL}/api/feedback?articleId=${a.external_id ?? a.id}`;
-  const stripe  = a.impactLevel === "high"
-    ? `<td style="width:4px;background:#F59E0B"></td>`
-    : "";
+  const isVideo = isVideoArticle(a);
+  const readCta = isVideo ? "Watch video →" : "Read full article →";
+  const sourceLbl = isVideo ? `🎬 ${a.source_name ?? ""}` : (a.source_name ?? "");
+  const rule    = index < 4 ? `<tr><td style="padding:0 0 20px"><hr style="border:none;border-top:1px solid #E5E7EB;margin:0"></td></tr>` : "";
 
   return `
-<tr><td style="padding-bottom:20px">
-  <table width="100%" cellpadding="0" cellspacing="0"
-         style="background:#fff;border:1px solid #E5E7EB;border-radius:10px;overflow:hidden">
-    <tr>
-      ${stripe}
-      <td style="padding:20px 22px">
-        <table width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-bottom:6px">
-          <span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background:${imp.bg};color:${imp.color}">${imp.label}</span>
-          ${a.source_name ? `<span style="margin-left:8px;font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.08em">${a.source_name}${pubDate ? ` · ${pubDate}` : ""}</span>` : ""}
-        </td></tr>
-        <tr><td style="padding-bottom:8px">
-          <a href="${a.article_url}" style="font-size:16px;font-weight:700;color:#111827;text-decoration:none;line-height:1.4">${a.title}</a>
-        </td></tr>
-        <tr><td style="padding-bottom:14px;font-size:14px;color:#374151;line-height:1.65">
-          ${a.aiSummary || a.summary || ""}
-        </td></tr>
-        <tr><td>
-          <a href="${base}&vote=up&redirect=${encodeURIComponent(a.article_url)}"
-             style="display:inline-block;margin-right:8px;padding:4px 12px;border-radius:6px;border:1px solid #D1FAE5;background:#F0FDF4;font-size:12px;font-weight:600;color:#166534;text-decoration:none">👍 Useful</a>
-          <a href="${base}&vote=down&redirect=${encodeURIComponent(a.article_url)}"
-             style="display:inline-block;margin-right:16px;padding:4px 12px;border-radius:6px;border:1px solid #FEE2E2;background:#FEF2F2;font-size:12px;font-weight:600;color:#B91C1C;text-decoration:none">👎 Not relevant</a>
-          <a href="${a.article_url}" style="font-size:12px;color:${BRAND};text-decoration:underline">Read full article →</a>
-        </td></tr></table>
-      </td>
-    </tr>
+<tr><td style="padding-bottom:24px">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td style="padding-bottom:6px">
+      <span style="display:inline-block;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;background:${imp.bg};color:${imp.color}">${a.topic ?? ""}</span>
+      ${a.impactLevel === "high" ? `<span style="margin-left:8px;font-size:11px;color:#92400E">⚡</span>` : ""}
+    </td></tr>
+    <tr><td style="padding-bottom:8px">
+      <a href="${a.article_url}" style="font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:700;color:#111827;text-decoration:none;line-height:1.35">${a.title}</a>
+    </td></tr>
+    <tr><td style="padding-bottom:10px;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#374151;line-height:1.65">
+      ${a.aiSummary || a.summary || ""}
+    </td></tr>
+    ${a.impactAnalysis && a.impactLevel !== "low" ? `
+    <tr><td style="padding-bottom:12px">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:3px;background:#F0A500;border-radius:2px"></td>
+          <td style="padding:8px 12px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-style:italic;color:#5C4A00;line-height:1.6">
+            ⚡ Impacts you: ${a.impactAnalysis}
+          </td>
+        </tr>
+      </table>
+    </td></tr>` : ""}
+    <tr><td>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        ${sourceLbl ? `<span style="font-family:monospace;font-size:10px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.08em">${sourceLbl}${pubDate ? ` · ${pubDate}` : ""}</span>` : ""}
+        <a href="${a.article_url}" style="font-family:monospace;font-size:11px;color:${BRAND};text-decoration:underline;letter-spacing:.04em">${readCta}</a>
+      </div>
+    </td></tr>
   </table>
-</td></tr>`;
+</td></tr>
+${rule}`;
 }
 
 export function buildEmailHtml(articles: ScoredArticle[], userEmail: string): string {
-  const today = new Date().toLocaleDateString("en-MY", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
+  const now     = new Date();
+  const dayOfWeek = now.toLocaleDateString("en-MY", { weekday: "long" });
+  const dateStr   = now.toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -64,23 +73,29 @@ export function buildEmailHtml(articles: ScoredArticle[], userEmail: string): st
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
 
-      <tr><td style="padding-bottom:28px;text-align:center">
-        <div style="font-size:30px;font-weight:800;color:${BRAND};letter-spacing:-.5px">${APP_NAME}</div>
-        <div style="margin-top:4px;font-size:13px;color:#6B7280">Your personalised news digest &middot; ${today}</div>
+      <!-- Header -->
+      <tr><td style="padding-bottom:4px;text-align:center">
+        <div style="font-family:Georgia,'Times New Roman',serif;font-size:36px;font-weight:800;color:${BRAND};letter-spacing:.12em;text-transform:uppercase">${APP_NAME}</div>
+      </td></tr>
+      <tr><td style="padding-bottom:6px"><hr style="border:none;border-top:2px solid #0F0E0C;margin:0"></td></tr>
+      <tr><td style="padding-bottom:24px;text-align:center">
+        <span style="font-family:monospace;font-size:11px;color:#6B7280;letter-spacing:.08em;text-transform:uppercase">${dayOfWeek}, ${dateStr} &middot; Personal Edition</span>
       </td></tr>
 
+      <!-- Articles -->
       <tr><td>
         <table width="100%" cellpadding="0" cellspacing="0">
-          ${articles.map(articleRow).join("")}
+          ${articles.slice(0, 5).map((a, i) => articleRow(a, i)).join("")}
         </table>
       </td></tr>
 
-      <tr><td style="padding-top:8px;text-align:center;font-size:12px;color:#9CA3AF;line-height:1.7">
-        <div>You&rsquo;re receiving this because you set up a ${APP_NAME} digest.</div>
+      <!-- Footer -->
+      <tr><td style="padding-top:24px;text-align:center;font-size:12px;color:#9CA3AF;line-height:1.7">
+        <div>You&rsquo;re receiving this because you scheduled a ${APP_NAME} digest.</div>
         <div style="margin-top:4px">
           <a href="${APP_URL}/settings" style="color:${BRAND};text-decoration:underline">Manage your schedule</a>
           &nbsp;&middot;&nbsp;
-          <a href="${APP_URL}/unsubscribe?email=${encodeURIComponent(userEmail)}" style="color:#9CA3AF;text-decoration:underline">Unsubscribe</a>
+          <a href="${APP_URL}/settings" style="color:#9CA3AF;text-decoration:underline">Unsubscribe</a>
         </div>
       </td></tr>
 
@@ -93,7 +108,6 @@ export function buildEmailHtml(articles: ScoredArticle[], userEmail: string): st
 // Legacy alias
 export const renderDigestEmailHtml = buildEmailHtml;
 
-// JSX component kept for documentation / future Resend React integration
 export function DigestEmailTemplate({ articles }: { articles: ScoredArticle[] }) {
   return (
     <div>

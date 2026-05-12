@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { Resend } from "resend";
-import { fetchAllSources } from "@/lib/sources";
-import { buildDigest } from "@/lib/ai/digest";
-import { renderDigestEmailHtml } from "@/lib/email/templates";
+import { buildArticleQueue } from "@/lib/queue/buildQueue";
+import { buildEmailHtml } from "@/lib/email/templates";
 import { APP_NAME, FROM_EMAIL } from "@/lib/constants";
-import type { VoteValue } from "@/lib/types";
+import type { ImpactLevel, ScoredArticle, VoteValue } from "@/lib/types";
 
 const BATCH_SIZE = 10;
 
-// Service-role client bypasses RLS — safe for server-only cron use
 function createServiceClient() {
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,18 +17,16 @@ function createServiceClient() {
 }
 
 export async function GET(request: NextRequest) {
-  // ── Auth: verify cron secret ──────────────────────────────────────────────────
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const supabase = createServiceClient();
   const resend   = new Resend(process.env.RESEND_API_KEY);
 
-  // ── Find users whose digest_time is within 5 min of current UTC time ──────────
-  const now = new Date();
+  const now           = new Date();
   const currentHour   = now.getUTCHours();
   const currentMinute = now.getUTCMinutes();
 
@@ -38,13 +34,12 @@ export async function GET(request: NextRequest) {
     .from("profiles")
     .select("id, email, occupation, location, life_stage, vehicle, email_digest_enabled, digest_time, digest_frequency")
     .eq("email_digest_enabled", true)
-    .limit(200); // safety cap; filter by time in JS
+    .limit(200);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const matching = (profiles ?? []).filter((p) => {
     if (!p.digest_time) return false;
-    // digest_time is stored as "HH:MM:SS"
     const [h, m] = (p.digest_time as string).split(":").map(Number);
     if (h !== currentHour) return false;
     return Math.abs((m ?? 0) - currentMinute) <= 5;
@@ -55,17 +50,16 @@ export async function GET(request: NextRequest) {
 
   for (const profile of batch) {
     try {
-      // Fetch topics for this user
-      const [topicsResult, feedbackResult] = await Promise.all([
+      const [topicsResult, feedbackResult, algoResult, clicksResult] = await Promise.all([
         supabase.from("user_topics").select("*").eq("user_id", profile.id),
-        supabase
-          .from("article_feedback")
-          .select("vote, articles(external_id)")
-          .eq("user_id", profile.id),
+        supabase.from("article_feedback").select("vote, articles(external_id)").eq("user_id", profile.id),
+        supabase.from("user_algorithm_settings").select("*").eq("user_id", profile.id).maybeSingle(),
+        supabase.from("article_clicks").select("article_url").eq("user_id", profile.id),
       ]);
 
-      const topics = topicsResult.data ?? [];
-      const topicNames = topics.map((t) => t.topic);
+      const topics            = topicsResult.data ?? [];
+      const algorithmSettings = algoResult.data ?? null;
+      const clickedUrls       = new Set((clicksResult.data ?? []).map((r) => r.article_url));
 
       const feedbackMap: Record<string, VoteValue> = {};
       for (const row of feedbackResult.data ?? []) {
@@ -75,62 +69,73 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      const rawArticles = await fetchAllSources(topicNames);
-      const preferences = { profile: { ...profile, digest_frequency: profile.digest_frequency as "daily" | "weekly", created_at: "", updated_at: "" }, topics };
-      const digest      = await buildDigest(rawArticles, preferences, feedbackMap);
+      const profileObj = {
+        ...profile,
+        digest_frequency: profile.digest_frequency as "daily" | "weekly",
+        created_at: "", updated_at: "",
+      };
+      const preferences = { profile: profileObj, topics };
 
-      // Persist digest entries
-      if (digest.articles.length > 0) {
-        const articleRows = digest.articles.map((a) => ({
-          external_id: a.external_id, title: a.title, summary: a.summary,
-          source_name: a.source_name, source_url: a.source_url,
-          article_url: a.article_url, topic: a.topic, published_at: a.published_at,
-        }));
+      // Build the queue (enriches first 5 immediately)
+      await buildArticleQueue(profile.id, preferences, algorithmSettings, feedbackMap, clickedUrls, supabase);
 
-        const { data: upserted } = await supabase
-          .from("articles")
-          .upsert(articleRows, { onConflict: "external_id" })
-          .select("id, external_id");
+      // Fetch top 5 unserved articles for the email
+      const { data: queueRows } = await supabase
+        .from("article_queue")
+        .select(`
+          relevance_score, impact_level, ai_summary, impact_analysis, topic,
+          articles (
+            id, external_id, title, summary, source_name, source_url,
+            article_url, topic, published_at, fetched_at, is_video
+          )
+        `)
+        .eq("user_id", profile.id)
+        .eq("served", false)
+        .order("position", { ascending: true })
+        .limit(5);
 
-        const idMap = new Map<string, string>();
-        for (const row of upserted ?? []) {
-          if (row.external_id) idMap.set(row.external_id, row.id);
-        }
+      const articles: ScoredArticle[] = (queueRows ?? [])
+        .filter((r) => r.articles)
+        .map((r) => {
+          const a = r.articles as unknown as {
+            id: string; external_id: string | null; title: string;
+            summary: string | null; source_name: string | null; source_url: string | null;
+            article_url: string; topic: string | null; published_at: string | null;
+            fetched_at: string; is_video: boolean | null;
+          };
+          return {
+            ...a,
+            is_video:       a.is_video ?? false,
+            relevanceScore: r.relevance_score,
+            impactLevel:    (r.impact_level ?? "medium") as ImpactLevel,
+            aiSummary:      r.ai_summary ?? a.summary ?? "",
+            impactAnalysis: r.impact_analysis ?? undefined,
+            userVote:       null,
+          };
+        });
 
-        const entryRows = digest.articles
-          .map((a) => {
-            const articleId = idMap.get(a.external_id ?? a.id);
-            if (!articleId) return null;
-            return { user_id: profile.id, article_id: articleId, relevance_score: a.relevanceScore, impact_level: a.impactLevel, ai_summary: a.aiSummary };
-          })
-          .filter(Boolean);
+      if (articles.length > 0) {
+        const dayOfWeek = now.toLocaleDateString("en-MY", { weekday: "long" });
+        const dateStr   = now.toLocaleDateString("en-MY", { day: "numeric", month: "long" });
+        const html      = buildEmailHtml(articles, profile.email);
 
-        if (entryRows.length > 0) {
-          await supabase.from("digest_entries").upsert(entryRows as object[], { onConflict: "user_id,article_id" });
-        }
-      }
-
-      // Send email if enabled
-      if (profile.email_digest_enabled && digest.articles.length > 0) {
-        const html = renderDigestEmailHtml(digest.articles, profile.email);
         const { error: sendError } = await resend.emails.send({
           from:    `${APP_NAME} <${FROM_EMAIL}>`,
           to:      profile.email,
-          subject: `Your ${APP_NAME} digest — ${now.toLocaleDateString("en-MY", { weekday: "long", day: "numeric", month: "long" })}`,
+          subject: `Your ${APP_NAME} Digest · ${dayOfWeek}, ${dateStr}`,
           html,
         });
 
         await supabase.from("email_log").insert({
           user_id:       profile.id,
           status:        sendError ? "failed" : "sent",
-          article_count: digest.articles.length,
+          article_count: articles.length,
         });
       }
 
       processed++;
     } catch (err) {
       console.error(`Cron: failed for user ${profile.id}`, err);
-      // Continue processing other users
     }
   }
 

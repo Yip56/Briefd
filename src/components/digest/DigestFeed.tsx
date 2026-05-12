@@ -613,7 +613,7 @@ function DigestFeedInner() {
           }}
         >
           {queueStats.currentEnd} of {queueStats.totalQueued} articles shown
-          {queueStats.nextRefreshAvailable ? " · REFRESH FOR NEXT 15 →" : ""}
+          {queueStats.nextRefreshAvailable ? " · Refresh for next 5 →" : ""}
         </p>
       )}
 

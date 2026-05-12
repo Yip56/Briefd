@@ -3,6 +3,8 @@ import { RSS_FEEDS } from "@/lib/constants";
 import { fetchNewsApiArticles } from "./newsapi";
 import { fetchRssFeeds } from "./rss";
 import { fetchRedditPosts } from "./reddit";
+import { fetchGoogleNews } from "./googlenews";
+import { fetchYouTubeVideos } from "./youtube";
 
 const MAX_ARTICLES = 100;
 
@@ -90,24 +92,33 @@ const FALLBACK_ARTICLES: RawArticle[] = [
 ];
 
 export async function fetchAllSources(topics: string[]): Promise<RawArticle[]> {
-  const newsApiKey = process.env.NEWSAPI_KEY ?? "";
+  const newsApiKey  = process.env.NEWSAPI_KEY ?? "";
+  const youtubeKey  = process.env.YOUTUBE_API_KEY ?? "";
 
-  const [newsApiResult, rssResult, redditResult] = await Promise.allSettled([
-    fetchNewsApiArticles(topics, newsApiKey),
-    fetchRssFeeds([...RSS_FEEDS]),
-    fetchRedditPosts(),
-  ]);
+  const [newsApiResult, rssResult, redditResult, googleNewsResult, youtubeResult] =
+    await Promise.allSettled([
+      fetchNewsApiArticles(topics, newsApiKey),
+      fetchRssFeeds([...RSS_FEEDS]),
+      fetchRedditPosts(),
+      fetchGoogleNews(topics),
+      fetchYouTubeVideos(topics, youtubeKey),
+    ]);
 
-  const combined: RawArticle[] = [
-    ...(newsApiResult.status === "fulfilled" ? newsApiResult.value : []),
-    ...(rssResult.status === "fulfilled" ? rssResult.value : []),
-    ...(redditResult.status === "fulfilled" ? redditResult.value : []),
-  ];
+  const newsApi    = newsApiResult.status    === "fulfilled" ? newsApiResult.value    : [];
+  const rss        = rssResult.status        === "fulfilled" ? rssResult.value        : [];
+  const reddit     = redditResult.status     === "fulfilled" ? redditResult.value     : [];
+  const googleNews = googleNewsResult.status === "fulfilled" ? googleNewsResult.value : [];
+  const youtube    = youtubeResult.status    === "fulfilled" ? youtubeResult.value    : [];
 
-  // If all live sources failed or returned nothing, use fallbacks so demo is never empty
-  const source = combined.length > 0 ? combined : [...FALLBACK_ARTICLES];
+  console.log(
+    `[Sources] Fetched: ${newsApi.length} NewsAPI + ${rss.length} RSS + ${reddit.length} Reddit ` +
+    `+ ${googleNews.length} GoogleNews + ${youtube.length} YouTube = ` +
+    `${newsApi.length + rss.length + reddit.length + googleNews.length + youtube.length} total`
+  );
 
-  // Global deduplication by URL across all sources
+  const combined = [...newsApi, ...rss, ...reddit, ...googleNews, ...youtube];
+  const source   = combined.length > 0 ? combined : [...FALLBACK_ARTICLES];
+
   const seen = new Set<string>();
   const deduped = source.filter((a) => {
     if (seen.has(a.articleUrl)) return false;
@@ -115,7 +126,6 @@ export async function fetchAllSources(topics: string[]): Promise<RawArticle[]> {
     return true;
   });
 
-  // Sort newest-first before capping — ensures the 100 we keep are the freshest
   deduped.sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );

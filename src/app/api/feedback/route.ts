@@ -49,7 +49,9 @@ export async function POST(request: NextRequest) {
         articleTitle ?? "",
         reason ?? "",
         freeText ?? "",
-        articleTopic ?? ""
+        articleTopic ?? "",
+        user.id,
+        supabase
       );
 
       if (keywords.length > 0) {

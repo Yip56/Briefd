@@ -141,7 +141,10 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
     : null;
 
   const isHigh    = article.impactLevel === "high";
+  const isVideo   = article.is_video === true || (article.external_id ?? "").startsWith("yt_");
   const chips     = getReasonChips(article.topic);
+  const readLabel = isVideo ? "WATCH VIDEO →" : "READ FULL ARTICLE →";
+  const readLabelShort = isVideo ? "Watch →" : "Read →";
   const summary   = article.aiSummary || article.summary || "";
   const hasImpact = article.impactAnalysis &&
     article.impactAnalysis !== "Impact analysis unavailable for this article." &&
@@ -373,7 +376,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               {article.source_name && (
                 <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "10px", color: "#9C9890" }}>
-                  {article.source_name}
+                  {isVideo ? "🎬 " : ""}{article.source_name}
                 </span>
               )}
               {pubDate && (
@@ -398,7 +401,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
                   fontWeight: 500,
                 }}
               >
-                READ FULL ARTICLE →
+                {readLabel}
               </a>
             </div>
           </div>
@@ -450,7 +453,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {article.source_name && (
                 <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "10px", color: "#9C9890" }}>
-                  {article.source_name}
+                  {isVideo ? "🎬 " : ""}{article.source_name}
                 </span>
               )}
               {pubDate && (
@@ -474,7 +477,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
                   color: "#1D5C3A",
                 }}
               >
-                Read →
+                {readLabelShort}
               </a>
             </div>
           </div>
@@ -528,7 +531,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {article.source_name && (
               <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "9px", color: "#9C9890" }}>
-                {article.source_name}
+                {isVideo ? "🎬 " : ""}{article.source_name}
               </span>
             )}
             {feedbackRow}
@@ -546,7 +549,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
                 marginLeft: "auto",
               }}
             >
-              Read →
+              {readLabelShort}
             </a>
           </div>
         </div>
@@ -625,7 +628,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
             {feedbackRow}
             {article.source_name && (
               <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "9px", color: "#9C9890" }}>
-                {article.source_name}
+                {isVideo ? "🎬 " : ""}{article.source_name}
               </span>
             )}
             <a
@@ -640,7 +643,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
                 color: "#1D5C3A",
               }}
             >
-              Read →
+              {readLabelShort}
             </a>
           </div>
         </div>

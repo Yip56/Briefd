@@ -14,17 +14,33 @@ import {
 } from "@/lib/constants";
 import type { Profile } from "@/lib/types";
 
-function Select({
-  label, value, onChange, options,
-}: {
+interface UsageBreakdownRow {
+  call_type: string;
+  count: number;
+  tokens_est: number;
+}
+
+interface DailyBudget {
+  callsUsed: number;
+  callsLimit: number;
+  remaining: number;
+  resetAt: string;
+}
+
+interface UsageData {
+  dailyBudget: DailyBudget;
+  todayBreakdown: UsageBreakdownRow[];
+  weekHistory: Array<{ date: string; calls_used: number; articles_analysed: number; feedback_calls: number }>;
+}
+
+function Select({ label, value, onChange, options }: {
   label: string; value: string; onChange: (v: string) => void; options: readonly string[];
 }) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1.5">{label}</label>
       <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={value} onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-gray-200 px-3.5 py-2.5 text-sm text-gray-900 bg-white outline-none focus:border-brand focus:ring-2 focus:ring-brand-ring"
       >
         <option value="">Select…</option>
@@ -61,6 +77,130 @@ function topicWeight(index: number): number {
   return 1.0;
 }
 
+// ─── AI Usage Section ────────────────────────────────────────────────────────
+
+function AIUsageSection({ usage }: { usage: UsageData | null }) {
+  const [showHistory, setShowHistory] = useState(false);
+
+  if (!usage) {
+    return (
+      <SectionCard title="AI Usage">
+        <p className="text-sm text-gray-400">Loading usage data…</p>
+      </SectionCard>
+    );
+  }
+
+  const { dailyBudget, todayBreakdown, weekHistory } = usage;
+  const pct = (dailyBudget.callsUsed / dailyBudget.callsLimit) * 100;
+  const barColor = pct >= 100 ? "#DC2626" : pct >= 80 ? "#D97706" : "#1D5C3A";
+  const resetTime = new Date(dailyBudget.resetAt).toLocaleTimeString("en-MY", {
+    hour: "2-digit", minute: "2-digit",
+  });
+
+  return (
+    <SectionCard title="AI Usage">
+      {/* Row 1 — Daily budget */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-sm font-medium text-gray-700">Daily AI calls</span>
+          <span className="text-sm font-mono text-gray-600">{dailyBudget.callsUsed} / {dailyBudget.callsLimit}</span>
+        </div>
+        <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden mb-1.5">
+          <div
+            style={{ width: `${Math.min(100, pct)}%`, background: barColor, transition: "width 0.3s" }}
+            className="h-full rounded-full"
+          />
+        </div>
+        <p className="text-xs text-gray-500">
+          {dailyBudget.callsUsed} of {dailyBudget.callsLimit} calls used today · Resets at {resetTime}
+        </p>
+        <p style={{ fontFamily: "var(--font-dm-mono, monospace)" }} className="text-xs text-gray-400 mt-1">
+          Each digest refresh uses up to 10 calls (5 article analyses)
+        </p>
+      </div>
+
+      {/* Row 2 — Breakdown table */}
+      {todayBreakdown.length > 1 && (
+        <div className="mb-6">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-gray-400 border-b border-gray-100">
+                <th className="text-left py-1.5 font-medium">Call Type</th>
+                <th className="text-right py-1.5 font-medium">Count Today</th>
+                <th className="text-right py-1.5 font-medium">Tokens (est.)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {todayBreakdown.map((row) => (
+                <tr key={row.call_type} className={`border-b border-gray-50 ${row.call_type === "Total" ? "font-semibold text-gray-700" : "text-gray-600"}`}>
+                  <td className="py-1.5">{row.call_type}</td>
+                  <td className="text-right py-1.5 font-mono">{row.count}</td>
+                  <td className="text-right py-1.5 font-mono">{row.tokens_est.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Row 3 — Cost saving tips */}
+      <div className="mb-6 p-4 bg-gray-50 rounded-xl">
+        <p style={{ fontFamily: "var(--font-dm-mono, monospace)" }} className="text-xs text-gray-500 uppercase tracking-wide mb-2">
+          How to reduce AI usage
+        </p>
+        <ul className="space-y-1.5 text-xs text-gray-600">
+          <li>✓ Articles are cached — each article is only analysed once ever</li>
+          <li>✓ Low impact articles skip AI analysis entirely</li>
+          <li>↓ Reduce digest refreshes to save calls (each refresh = up to 10 calls)</li>
+          <li>↓ Fewer selected topics = fewer articles to analyse</li>
+          <li>↓ High Impact filter shows pre-analysed articles only</li>
+        </ul>
+      </div>
+
+      {/* Row 4 — Reset info + history */}
+      <div>
+        <p className="text-xs text-gray-400 mb-3">
+          Your daily budget resets at 12:00 AM Malaysia time (UTC+8)
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowHistory((v) => !v)}
+          className="text-xs text-brand hover:underline transition-colors"
+        >
+          {showHistory ? "Hide" : "View full"} usage history (last 7 days)
+        </button>
+        {showHistory && weekHistory.length > 0 && (
+          <table className="w-full text-xs mt-3">
+            <thead>
+              <tr className="text-gray-400 border-b border-gray-100">
+                <th className="text-left py-1.5 font-medium">Date</th>
+                <th className="text-right py-1.5 font-medium">Calls Used</th>
+                <th className="text-right py-1.5 font-medium">Articles Analysed</th>
+                <th className="text-right py-1.5 font-medium">Feedback Calls</th>
+              </tr>
+            </thead>
+            <tbody>
+              {weekHistory.map((row) => (
+                <tr key={row.date} className="text-gray-600 border-b border-gray-50">
+                  <td className="py-1.5">{row.date}</td>
+                  <td className="text-right py-1.5 font-mono">{row.calls_used}</td>
+                  <td className="text-right py-1.5 font-mono">{row.articles_analysed}</td>
+                  <td className="text-right py-1.5 font-mono">{row.feedback_calls}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {showHistory && weekHistory.length === 0 && (
+          <p className="text-xs text-gray-400 mt-2">No usage data yet.</p>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function SettingsPage() {
   const { showToast } = useToast();
 
@@ -77,10 +217,12 @@ export default function SettingsPage() {
   const [digestTime,      setDigestTime]      = useState("08:00");
   const [digestFrequency, setDigestFrequency] = useState<"daily" | "weekly">("daily");
   const [emailEnabled,    setEmailEnabled]    = useState(true);
+  const [lastEmailSent,   setLastEmailSent]   = useState<string | null>(null);
 
   const [saving,      setSaving]      = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [loading,     setLoading]     = useState(true);
+  const [usage,       setUsage]       = useState<UsageData | null>(null);
 
   useEffect(() => {
     fetch("/api/profile")
@@ -95,7 +237,6 @@ export default function SettingsPage() {
         setDigestFrequency(p?.digest_frequency ?? "daily");
         setEmailEnabled(p?.email_digest_enabled ?? true);
 
-        // Topics are returned sorted by weight desc (profile route orders by weight)
         const presets: string[] = [];
         const custom:  string[] = [];
         for (const t of topics ?? []) {
@@ -103,37 +244,35 @@ export default function SettingsPage() {
           else             custom.push(t.topic);
         }
         setSelectedTopics(presets);
-        setTopicOrder(presets); // already weight-sorted from API
+        setTopicOrder(presets);
         setKeywords(custom);
       })
       .finally(() => setLoading(false));
+
+    // Fetch last email sent
+    fetch("/api/email/log")
+      .then((r) => r.json())
+      .then((d) => { if (d.lastSentAt) setLastEmailSent(d.lastSentAt); })
+      .catch(() => {});
+
+    // Fetch AI usage
+    fetch("/api/usage")
+      .then((r) => r.json())
+      .then((d) => { if (d.dailyBudget) setUsage(d); })
+      .catch(() => {});
   }, []);
 
   function toggleTopic(topic: string) {
     const isSelected = selectedTopics.includes(topic);
-    setSelectedTopics((prev) =>
-      isSelected ? prev.filter((t) => t !== topic) : [...prev, topic]
-    );
-    setTopicOrder((order) =>
-      isSelected
-        ? order.filter((t) => t !== topic)
-        : order.includes(topic) ? order : [...order, topic]
-    );
+    setSelectedTopics((prev) => isSelected ? prev.filter((t) => t !== topic) : [...prev, topic]);
+    setTopicOrder((order) => isSelected ? order.filter((t) => t !== topic) : order.includes(topic) ? order : [...order, topic]);
   }
 
   async function handleSave() {
     setSaving(true);
     try {
-      const orderedPresets = topicOrder.map((topic, i) => ({
-        topic,
-        weight: topicWeight(i),
-        is_preset: true,
-      }));
-      const keywordTopics = keywords.map((kw) => ({
-        topic: kw,
-        weight: 1.0,
-        is_preset: false,
-      }));
+      const orderedPresets = topicOrder.map((topic, i) => ({ topic, weight: topicWeight(i), is_preset: true }));
+      const keywordTopics  = keywords.map((kw) => ({ topic: kw, weight: 1.0, is_preset: false }));
 
       const res = await fetch("/api/profile", {
         method: "POST",
@@ -213,9 +352,19 @@ export default function SettingsPage() {
         {!emailEnabled && (
           <p className="text-xs text-gray-400 mt-2">Enable email digest above to send a test.</p>
         )}
+        {lastEmailSent && (
+          <p className="text-xs text-gray-400 mt-3">
+            Last digest sent:{" "}
+            <strong className="text-gray-600">
+              {new Date(lastEmailSent).toLocaleString("en-MY", {
+                weekday: "long", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+              })}
+            </strong>
+          </p>
+        )}
       </SectionCard>
 
-      {/* Topics with drag-to-rank */}
+      {/* Topics */}
       <SectionCard title="Topics & keywords">
         <TopicPicker
           selected={selectedTopics}
@@ -258,12 +407,13 @@ export default function SettingsPage() {
         </p>
       </div>
 
+      {/* AI Usage */}
+      <AIUsageSection usage={usage} />
+
       {/* Save */}
       <div className="flex justify-end py-2">
         <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
+          type="button" onClick={handleSave} disabled={saving}
           className="px-6 py-2.5 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover disabled:opacity-60 transition-colors"
         >
           {saving ? "Saving…" : "Save changes"}
