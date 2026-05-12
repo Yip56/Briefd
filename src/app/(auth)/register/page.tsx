@@ -53,7 +53,7 @@ export default function RegisterPage() {
 
       // If email confirmation is disabled, a session is returned immediately
       if (data.session) {
-        router.push("/");
+        router.push("/digest");
         router.refresh();
         return;
       }

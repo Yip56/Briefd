@@ -2,8 +2,9 @@
 
 @theme inline {
   /* Typography */
-  --font-sans: var(--font-dm-sans);
-  --font-serif: var(--font-instrument-serif);
+  --font-sans: var(--font-source-serif);
+  --font-serif: var(--font-playfair);
+  --font-mono: var(--font-dm-mono);
 
   /* Brand */
   --color-brand:       #1D5C3A;
@@ -11,22 +12,165 @@
   --color-brand-light: #e8f5ee;
   --color-brand-ring:  #1D5C3A40;
 
-  /* Surfaces */
-  --color-app-bg: #F5F3EE;
+  /* Editorial surfaces */
+  --color-bg:       #F7F4EF;
+  --color-bg-dark:  #1A1814;
+  --color-surface:  #FFFFFF;
+  --color-surface2: #F0ECE4;
+
+  /* Editorial text */
+  --color-ink:   #0F0E0C;
+  --color-ink-2: #5C5750;
+  --color-ink-3: #9C9890;
+
+  /* Accents */
+  --color-accent-warm: #B5451B;
+  --color-accent-gold: #C9972A;
+  --color-rule:        #0F0E0C;
+
+  /* Legacy compat */
+  --color-app-bg: #F7F4EF;
   --color-card:   #ffffff;
 }
 
 :root {
-  --background: #F5F3EE;
-  --foreground: #1a1a1a;
+  --bg:           #F7F4EF;
+  --bg-dark:      #1A1814;
+  --surface:      #FFFFFF;
+  --surface2:     #F0ECE4;
+  --border:       rgba(0,0,0,0.12);
+  --border-strong: rgba(0,0,0,0.25);
+  --text:         #0F0E0C;
+  --text-2:       #5C5750;
+  --text-3:       #9C9890;
+  --accent:       #1D5C3A;
+  --accent-warm:  #B5451B;
+  --accent-gold:  #C9972A;
+  --rule:         #0F0E0C;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-source-serif), Georgia, "Times New Roman", serif;
 }
 
-/* Ultra-thin card border helper */
+/* Paper texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair), Georgia, serif;
+}
+
+/* ─── Animations ──────────────────────────────────────────────────────── */
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+@keyframes fadeScaleIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes slideFromLeft {
+  from { transform: translateX(-20px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes growBorderLeft {
+  from { height: 0; }
+  to   { height: 100%; }
+}
+
+.animate-slideDown     { animation: slideDown     0.3s ease-out forwards; }
+.animate-fadeScaleIn   { animation: fadeScaleIn   0.4s ease-out 0.1s both; }
+.animate-slideFromLeft { animation: slideFromLeft 0.3s ease-out 0.2s both; }
+.animate-fadeUp-1      { animation: fadeUp        0.4s ease-out 0.3s both; }
+.animate-fadeUp-2      { animation: fadeUp        0.4s ease-out 0.4s both; }
+.animate-fadeUp-3      { animation: fadeUp        0.4s ease-out 0.5s both; }
+.animate-fadeUp-4      { animation: fadeUp        0.4s ease-out 0.6s both; }
+
+/* ─── Shimmer skeleton ────────────────────────────────────────────────── */
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    #E8E4DC 25%,
+    #F0EDE6 50%,
+    #E8E4DC 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 3px;
+}
+
+/* ─── Impact block entrance ───────────────────────────────────────────── */
+
+.impact-block {
+  opacity: 0;
+  transform: translateX(-12px);
+  transition: opacity 0.35s ease-out, transform 0.35s ease-out;
+}
+
+.impact-block.visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ─── Hover underline animation ───────────────────────────────────────── */
+
+.read-link {
+  position: relative;
+  text-decoration: none;
+}
+
+.read-link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  transition: width 0.2s ease-out;
+}
+
+.read-link:hover::after {
+  width: 100%;
+}
+
+/* ─── Mobile hamburger nav ────────────────────────────────────────────── */
+
+.mobile-nav-open .mobile-menu {
+  display: flex;
+}
+
+/* ─── Card border helper ──────────────────────────────────────────────── */
+
 .card-border {
   border: 0.5px solid rgb(0 0 0 / 0.1);
 }

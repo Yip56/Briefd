@@ -3,42 +3,387 @@
 import { useEffect, useState, useCallback } from "react";
 import { FilterBar } from "./FilterBar";
 import { ArticleCard } from "./ArticleCard";
+import { DigestSkeleton } from "./DigestSkeleton";
 import { DigestErrorBoundary } from "./DigestErrorBoundary";
-import { LoadingDots } from "@/components/ui/LoadingDots";
 import { useToast } from "@/components/ui/Toast";
-import type { DigestResult, ScoredArticle } from "@/lib/types";
+import type { DigestResult, ScoredArticle, DigestArchive } from "@/lib/types";
 import { GEMINI_QUOTA_EXCEEDED } from "@/lib/ai/summarise";
 
-function formatDateHeader(): string {
-  const now  = new Date();
-  const day  = now.toLocaleDateString("en-MY", { weekday: "long" });
-  const date = now.toLocaleDateString("en-MY", { day: "numeric", month: "long", year: "numeric" });
-  return `${day}, ${date} — Your Morning Briefing`;
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function formatDigestDate(): string {
+  const now = new Date();
+  const day  = now.toLocaleDateString("en-MY", { weekday: "long" }).toUpperCase();
+  const d    = now.getDate();
+  const mon  = now.toLocaleDateString("en-MY", { month: "long" }).toUpperCase();
+  const yr   = now.getFullYear();
+  return `${day} · ${d} ${mon} ${yr}`;
 }
+
+// ─── Newspaper grid ───────────────────────────────────────────────────────────
+
+function NewspaperGrid({
+  articles,
+  onRemove,
+}: {
+  articles: ScoredArticle[];
+  onRemove: (id: string) => void;
+}) {
+  if (articles.length === 0) return null;
+
+  const banner    = articles[0];
+  const twoCol    = articles.slice(1, 3);
+  const threeCol  = articles.slice(3, 6);
+  const listItems = articles.slice(6);
+
+  return (
+    <div>
+      {/* Banner article */}
+      <div className="animate-fadeUp-1">
+        <ArticleCard article={banner} onRemove={onRemove} variant="banner" />
+        <div style={{ borderBottom: "3px solid #0F0E0C", marginBottom: "28px" }} />
+      </div>
+
+      {/* 2-column */}
+      {twoCol.length > 0 && (
+        <div
+          className="animate-fadeUp-2"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 0,
+            marginBottom: "4px",
+          }}
+        >
+          {twoCol.map((a, i) => (
+            <div
+              key={a.id}
+              style={{
+                paddingRight: i === 0 ? "28px" : undefined,
+                paddingLeft:  i === 1 ? "28px" : undefined,
+                borderRight:  i === 0 && twoCol.length > 1 ? "1px solid rgba(0,0,0,0.12)" : undefined,
+              }}
+            >
+              <ArticleCard article={a} onRemove={onRemove} variant="twoCol" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 3-column */}
+      {threeCol.length > 0 && (
+        <div
+          className="animate-fadeUp-3"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 0,
+            borderTop: "1px solid rgba(0,0,0,0.12)",
+            paddingTop: "20px",
+            marginBottom: "4px",
+          }}
+        >
+          {threeCol.map((a, i) => (
+            <div
+              key={a.id}
+              style={{
+                paddingRight: i < 2 ? "20px" : undefined,
+                paddingLeft:  i > 0 ? "20px" : undefined,
+                borderRight:  i < threeCol.length - 1 ? "1px solid rgba(0,0,0,0.12)" : undefined,
+              }}
+            >
+              <ArticleCard article={a} onRemove={onRemove} variant="threeCol" />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* List */}
+      {listItems.length > 0 && (
+        <div
+          className="animate-fadeUp-4"
+          style={{ borderTop: "1px solid rgba(0,0,0,0.12)", paddingTop: "4px" }}
+        >
+          {listItems.map((a, i) => (
+            <div key={a.id}>
+              <ArticleCard article={a} onRemove={onRemove} variant="list" />
+              {i < listItems.length - 1 && (
+                <div style={{ borderBottom: "1px solid rgba(0,0,0,0.08)" }} />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Past digests accordion ───────────────────────────────────────────────────
+
+function ArchiveArticleRow({ article }: { article: ScoredArticle }) {
+  const pubDate = article.published_at
+    ? new Date(article.published_at).toLocaleDateString("en-MY", { day: "numeric", month: "short" })
+    : null;
+
+  return (
+    <div style={{ padding: "12px 0", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
+      {article.topic && (
+        <span
+          style={{
+            display: "inline-block",
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "9px",
+            letterSpacing: "0.1em",
+            color: "#5C5750",
+            background: "#F0ECE4",
+            padding: "2px 6px",
+            textTransform: "uppercase",
+            marginBottom: "4px",
+          }}
+        >
+          {article.topic}
+        </span>
+      )}
+      <a
+        href={article.article_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: "block",
+          fontFamily: "var(--font-playfair), Georgia, serif",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#0F0E0C",
+          marginBottom: "4px",
+          textDecoration: "none",
+          transition: "color 0.15s",
+          lineHeight: 1.35,
+        }}
+        className="hover:text-[#1D5C3A]"
+      >
+        {article.title}
+      </a>
+      <p
+        style={{
+          fontFamily: "var(--font-source-serif), Georgia, serif",
+          fontSize: "12px",
+          color: "#9C9890",
+          lineHeight: 1.6,
+          marginBottom: "4px",
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
+        {article.aiSummary || article.summary}
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        {article.source_name && (
+          <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "9px", color: "#9C9890" }}>
+            {article.source_name}
+          </span>
+        )}
+        {pubDate && (
+          <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "9px", color: "#9C9890" }}>
+            {pubDate}
+          </span>
+        )}
+        <a
+          href={article.article_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "9px", color: "#1D5C3A" }}
+        >
+          Read →
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function ArchiveEntry({ archive }: { archive: DigestArchive }) {
+  const [open, setOpen] = useState(false);
+  const label = archive.label ??
+    new Date(archive.archived_at).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <div style={{ border: "1px solid rgba(0,0,0,0.1)", marginBottom: "6px" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 16px",
+          background: open ? "#F0ECE4" : "transparent",
+          border: "none",
+          cursor: "pointer",
+          transition: "background 0.15s",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "11px",
+            letterSpacing: "0.06em",
+            color: "#5C5750",
+          }}
+        >
+          {label.toUpperCase()}
+        </span>
+        <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "10px", color: "#9C9890" }}>
+          {open ? "▲" : "▼"}
+        </span>
+      </button>
+      {open && (
+        <div style={{ padding: "0 16px", background: "#F7F4EF" }}>
+          {archive.articles.map((a, i) => (
+            <ArchiveArticleRow key={a.id ?? i} article={a} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PastDigests() {
+  const [archives, setArchives] = useState<DigestArchive[]>([]);
+  const [showAll,  setShowAll]  = useState(false);
+  const [loading,  setLoading]  = useState(true);
+  const [open,     setOpen]     = useState(false);
+
+  useEffect(() => {
+    fetch("/api/archives")
+      .then((r) => r.json())
+      .then((d) => setArchives(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (!loading && archives.length === 0) return null;
+
+  const visible = showAll ? archives : archives.slice(0, 5);
+
+  return (
+    <div style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid rgba(0,0,0,0.1)" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          fontFamily: "var(--font-dm-mono), monospace",
+          fontSize: "10px",
+          letterSpacing: "0.1em",
+          color: "#9C9890",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          textTransform: "uppercase",
+          marginBottom: "16px",
+          transition: "color 0.15s",
+        }}
+        className="hover:text-[#5C5750]"
+      >
+        <span>{open ? "▲" : "▼"}</span>
+        <span>PAST DIGESTS {archives.length > 0 ? `(${archives.length})` : ""}</span>
+      </button>
+
+      {open && (
+        <div>
+          {loading && (
+            <div
+              style={{
+                fontFamily: "var(--font-dm-mono), monospace",
+                fontSize: "10px",
+                color: "#9C9890",
+                padding: "16px 0",
+                letterSpacing: "0.08em",
+              }}
+            >
+              LOADING ARCHIVES…
+            </div>
+          )}
+          {visible.map((a) => (
+            <ArchiveEntry key={a.id} archive={a} />
+          ))}
+          {!showAll && archives.length > 5 && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              style={{
+                width: "100%",
+                padding: "8px",
+                fontFamily: "var(--font-dm-mono), monospace",
+                fontSize: "10px",
+                letterSpacing: "0.08em",
+                color: "#9C9890",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                textTransform: "uppercase",
+                transition: "color 0.15s",
+              }}
+              className="hover:text-[#1D5C3A]"
+            >
+              LOAD {archives.length - 5} MORE →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main feed ────────────────────────────────────────────────────────────────
 
 function DigestFeedInner() {
   const { showToast } = useToast();
 
-  const [digest,      setDigest]      = useState<DigestResult | null>(null);
-  const [articles,    setArticles]    = useState<ScoredArticle[]>([]);
-  const [loading,     setLoading]     = useState(true);
-  const [error,       setError]       = useState<string | null>(null);
-  const [activeTopic, setActiveTopic] = useState<string | null>(null);
-  const [refreshing,  setRefreshing]  = useState(false);
+  const [digest,            setDigest]            = useState<DigestResult | null>(null);
+  const [articles,          setArticles]          = useState<ScoredArticle[]>([]);
+  const [loading,           setLoading]           = useState(true);
+  const [error,             setError]             = useState<string | null>(null);
+  const [activeTopic,       setActiveTopic]       = useState<string | null>(null);
+  const [impactFilter,      setImpactFilter]      = useState(false);
+  const [refreshing,        setRefreshing]        = useState(false);
+  const [refreshMessage,    setRefreshMessage]    = useState<string | null>(null);
+  const [showRefreshBanner, setShowRefreshBanner] = useState(false);
+  const [dateStr,           setDateStr]           = useState("");
+
+  useEffect(() => { setDateStr(formatDigestDate()); }, []);
 
   const fetchDigest = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true); else setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+      setRefreshMessage("Archiving current digest…");
+    } else {
+      setLoading(true);
+    }
     setError(null);
+    setShowRefreshBanner(false);
 
     try {
-      const url  = isRefresh ? `/api/digest?t=${Date.now()}` : "/api/digest";
+      const url = isRefresh ? "/api/digest?refresh=true" : "/api/digest";
+      if (isRefresh) {
+        await new Promise((r) => setTimeout(r, 600));
+        setRefreshMessage("Loading next articles…");
+      }
       const res  = await fetch(url);
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data: DigestResult = await res.json();
       setDigest(data);
       setArticles(data.articles);
       setActiveTopic(null);
-      if (isRefresh) showToast("Digest refreshed", "success");
+      setImpactFilter(false);
+      if (isRefresh) {
+        setShowRefreshBanner(true);
+        showToast("Digest refreshed", "success");
+      }
     } catch {
       if (isRefresh) {
         showToast("Could not refresh — check your connection", "error");
@@ -48,6 +393,7 @@ function DigestFeedInner() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setRefreshMessage(null);
     }
   }, [showToast]);
 
@@ -57,147 +403,280 @@ function DigestFeedInner() {
     setArticles((prev) => prev.filter((a) => a.id !== id));
   }
 
-  const uniqueTopics = articles.length > 0
-    ? [...new Set(articles.map((a) => a.topic).filter(Boolean))] as string[]
-    : [];
+  const uniqueTopics     = [...new Set(articles.map((a) => a.topic).filter(Boolean))] as string[];
+  const highImpactCount  = articles.filter((a) => a.impactLevel === "high").length;
 
-  const visible = activeTopic
-    ? articles.filter((a) => a.topic === activeTopic)
-    : articles;
+  const visible = articles
+    .filter((a) => activeTopic === null || a.topic === activeTopic)
+    .filter((a) => !impactFilter || a.impactLevel === "high");
 
+  // ── Loading ──────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
-        <LoadingDots />
-        <p className="text-sm text-gray-400">Building your digest…</p>
-        <p className="text-xs text-gray-300">This takes 15–30 seconds on first load.</p>
-      </div>
-    );
+    return <DigestSkeleton />;
   }
 
+  // ── Error ────────────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="text-center py-16">
-        <p className="font-serif text-lg text-gray-700 mb-2">Something went wrong</p>
-        <p className="text-sm text-gray-400 mb-6">{error}</p>
+      <div style={{ textAlign: "center", padding: "64px 0" }}>
+        <p style={{ fontFamily: "var(--font-playfair), Georgia, serif", fontSize: "20px", color: "#0F0E0C", marginBottom: "8px" }}>
+          Something went wrong
+        </p>
+        <p style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "15px", color: "#9C9890", marginBottom: "24px" }}>
+          {error}
+        </p>
         <button
           onClick={() => fetchDigest()}
-          className="px-5 py-2 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors"
+          style={{
+            padding: "10px 24px",
+            background: "#0F0E0C",
+            color: "#F7F4EF",
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "12px",
+            letterSpacing: "0.06em",
+            border: "none",
+            cursor: "pointer",
+            transition: "background 0.15s",
+          }}
+          className="hover:bg-[#1D5C3A]"
         >
-          Try again
+          TRY AGAIN
         </button>
       </div>
     );
   }
 
+  // ── Empty ────────────────────────────────────────────────────────────────
   if (!digest || articles.length === 0) {
     return (
-      <div className="text-center py-20">
-        <div className="text-4xl mb-4">📭</div>
-        <p className="font-serif text-xl text-gray-700 mb-2">No news matched your topics today</p>
-        <p className="text-sm text-gray-400 mb-6 max-w-xs mx-auto">
-          Try adding more topics or custom keywords in{" "}
-          <a href="/settings" className="text-brand underline">Settings</a>.
+      <div style={{ textAlign: "center", padding: "80px 0" }}>
+        <p style={{ fontFamily: "var(--font-playfair), Georgia, serif", fontSize: "24px", color: "#0F0E0C", marginBottom: "8px" }}>
+          No articles matched today
+        </p>
+        <p style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "15px", color: "#9C9890", marginBottom: "24px" }}>
+          Try adding more topics or keywords in{" "}
+          <a href="/settings" style={{ color: "#1D5C3A" }}>Settings</a>.
         </p>
         <button
           onClick={() => fetchDigest(true)}
           disabled={refreshing}
-          className="text-sm text-brand underline disabled:opacity-50"
+          style={{
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "11px",
+            letterSpacing: "0.08em",
+            color: "#1D5C3A",
+            background: "none",
+            border: "1px solid #1D5C3A",
+            padding: "8px 20px",
+            cursor: "pointer",
+            opacity: refreshing ? 0.5 : 1,
+          }}
         >
-          {refreshing ? "Checking again…" : "Refresh now"}
+          {refreshing ? "CHECKING…" : "REFRESH NOW"}
         </button>
       </div>
     );
   }
 
+  const { queueStats } = digest;
+
   return (
-    <div className="max-w-2xl">
-      {/* Date header */}
-      <div className="mb-6">
-        <p className="text-xs text-gray-400 uppercase tracking-widest font-medium mb-1">
-          {formatDateHeader()}
-        </p>
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-300">
-            {digest.totalScored} articles scored ·{" "}
-            {new Date(digest.generatedAt).toLocaleTimeString("en-MY", {
-              hour: "2-digit", minute: "2-digit",
-            })}
-          </p>
-          <button
-            onClick={() => fetchDigest(true)}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-brand transition-colors disabled:opacity-50"
+    <div>
+      {/* ── Masthead header ── */}
+      <div className="animate-fadeScaleIn" style={{ borderTop: "3px solid #0F0E0C", marginBottom: "0" }}>
+        {/* Row 1: date | BRIEFD | edition */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 0",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "var(--font-dm-mono), monospace",
+              fontSize: "10px",
+              letterSpacing: "0.1em",
+              color: "#5C5750",
+              textTransform: "uppercase",
+            }}
           >
-            {refreshing ? <LoadingDots /> : "↻ Refresh"}
-          </button>
+            {dateStr}
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-playfair), Georgia, serif",
+              fontSize: "28px",
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              color: "#0F0E0C",
+              textTransform: "uppercase",
+            }}
+          >
+            BRIEFD
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--font-dm-mono), monospace",
+              fontSize: "10px",
+              letterSpacing: "0.1em",
+              color: "#5C5750",
+              textTransform: "uppercase",
+            }}
+          >
+            PERSONAL EDITION
+          </span>
         </div>
+
+        {/* Thin rule */}
+        <div style={{ borderTop: "1px solid rgba(0,0,0,0.15)", margin: "0 0 10px" }} />
+
+        {/* Row 2: filter bar */}
+        <div className="animate-slideFromLeft" style={{ marginBottom: "10px", overflowX: "auto" }}>
+          <FilterBar
+            topics={uniqueTopics}
+            activeTopic={activeTopic}
+            onSelect={setActiveTopic}
+            highImpactCount={highImpactCount}
+            impactFilter={impactFilter}
+            onToggleImpact={() => setImpactFilter((v) => !v)}
+          />
+        </div>
+
+        {/* Thick bottom rule */}
+        <div style={{ borderBottom: "2px solid #0F0E0C", marginBottom: "24px" }} />
       </div>
 
-      {/* Gemini quota banner */}
+      {/* ── Banners / meta ── */}
       {articles.some((a) => a.impactAnalysis === GEMINI_QUOTA_EXCEEDED) && (
-        <div className="mb-4 flex items-start gap-2.5 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-[13px] text-amber-800">
-          <span className="shrink-0 mt-0.5">⚡</span>
-          <div>
-            <span className="font-medium">Impact analysis paused</span>
+        <div
+          style={{
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "10px",
+            padding: "12px 16px",
+            background: "#FDF8ED",
+            borderLeft: "3px solid #C9972A",
+          }}
+        >
+          <span>⚡</span>
+          <div style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "13px", color: "#5C4A00" }}>
+            <strong>Impact analysis paused</strong>
             {" — "}your Gemini API quota is exceeded.{" "}
             {digest?.geminiQuotaRetryAfter && (
               <span>
                 Resets on{" "}
-                <span className="font-medium">
+                <strong>
                   {new Date(digest.geminiQuotaRetryAfter).toLocaleDateString("en-MY", {
                     day: "numeric", month: "long", year: "numeric",
                   })}
-                </span>
+                </strong>
                 .{" "}
               </span>
             )}
-            Top up early at{" "}
-            <a
-              href="https://aistudio.google.com/billing"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:text-amber-900"
-            >
+            Top up at{" "}
+            <a href="https://aistudio.google.com/billing" target="_blank" rel="noopener noreferrer" style={{ color: "#C9972A", textDecoration: "underline" }}>
               aistudio.google.com/billing
-            </a>
-            .
+            </a>.
           </div>
         </div>
       )}
 
-      {/* Filter bar */}
-      <div className="mb-4">
-        <FilterBar topics={uniqueTopics} activeTopic={activeTopic} onSelect={setActiveTopic} />
-      </div>
+      {showRefreshBanner && queueStats && (
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "8px 14px",
+            background: "#F0ECE4",
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "10px",
+            letterSpacing: "0.08em",
+            color: "#5C5750",
+            textTransform: "uppercase",
+          }}
+        >
+          DIGEST REFRESHED — ARTICLES {queueStats.currentStart}–{queueStats.currentEnd} OF {queueStats.totalQueued}
+        </div>
+      )}
+
+      {queueStats && (
+        <p
+          style={{
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "9px",
+            letterSpacing: "0.08em",
+            color: "#9C9890",
+            marginBottom: "12px",
+            textTransform: "uppercase",
+          }}
+        >
+          {queueStats.currentEnd} of {queueStats.totalQueued} articles shown
+          {queueStats.nextRefreshAvailable ? " · REFRESH FOR NEXT 15 →" : ""}
+        </p>
+      )}
 
       {refreshing && (
-        <div className="flex items-center gap-2 py-2 text-xs text-gray-400 mb-2">
-          <LoadingDots />
-          <span>Fetching latest articles…</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            marginBottom: "12px",
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "10px",
+            letterSpacing: "0.08em",
+            color: "#9C9890",
+            textTransform: "uppercase",
+          }}
+        >
+          <span className="animate-pulse">◈</span>
+          <span>{refreshMessage ?? "FETCHING LATEST ARTICLES…"}</span>
         </div>
       )}
 
-      {/* Articles */}
-      <div>
-        {visible.map((article, i) => (
-          <div key={article.id}>
-            <ArticleCard article={article} onRemove={removeArticle} />
-            {i < visible.length - 1 && <hr className="border-t border-gray-100" />}
-          </div>
-        ))}
-      </div>
+      {/* ── Newspaper grid ── */}
+      {visible.length === 0 && impactFilter ? (
+        <p style={{ padding: "32px 0", textAlign: "center", fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "15px", color: "#9C9890" }}>
+          No high impact articles{activeTopic ? ` in ${activeTopic}` : ""} right now.{" "}
+          <button
+            type="button"
+            onClick={() => { setActiveTopic(null); setImpactFilter(false); }}
+            style={{ color: "#1D5C3A", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Show all
+          </button>
+        </p>
+      ) : (
+        <NewspaperGrid articles={visible} onRemove={removeArticle} />
+      )}
 
-      {/* Bottom refresh */}
-      <div className="text-center mt-10 pb-4">
+      {/* ── Refresh footer ── */}
+      <div style={{ textAlign: "center", marginTop: "40px", paddingBottom: "16px" }}>
         <button
           onClick={() => fetchDigest(true)}
           disabled={refreshing}
-          className="px-5 py-2 border border-gray-200 rounded-full text-sm text-gray-500 hover:border-brand hover:text-brand transition-all disabled:opacity-50"
+          style={{
+            padding: "10px 28px",
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "11px",
+            letterSpacing: "0.1em",
+            color: refreshing ? "#9C9890" : "#0F0E0C",
+            background: "transparent",
+            border: "1px solid rgba(0,0,0,0.2)",
+            cursor: refreshing ? "not-allowed" : "pointer",
+            textTransform: "uppercase",
+            transition: "all 0.15s",
+          }}
+          className={refreshing ? "" : "hover:border-[#1D5C3A] hover:text-[#1D5C3A]"}
         >
-          {refreshing ? <LoadingDots /> : "Refresh digest"}
+          {refreshing ? "REFRESHING…" : "↻ REFRESH DIGEST"}
         </button>
       </div>
+
+      {/* ── Past digests ── */}
+      <PastDigests />
     </div>
   );
 }

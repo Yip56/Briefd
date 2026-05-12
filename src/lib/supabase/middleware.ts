@@ -1,8 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PROTECTED_ROUTES = ["/", "/settings"];
-const AUTH_ROUTES = ["/login", "/register"];
+const PROTECTED_ROUTES = ["/digest", "/settings", "/algorithm", "/archive"];
+const AUTH_ROUTES      = ["/login", "/register"];
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -31,18 +31,18 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Unauthenticated user hitting a protected route → /login
+  // Unauthenticated user hitting a protected route → /
   if (!user && PROTECTED_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"))) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    return NextResponse.redirect(loginUrl);
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
   }
 
-  // Authenticated user hitting an auth route → /
-  if (user && AUTH_ROUTES.includes(pathname)) {
-    const homeUrl = request.nextUrl.clone();
-    homeUrl.pathname = "/";
-    return NextResponse.redirect(homeUrl);
+  // Authenticated user hitting an auth route or the marketing home → /digest
+  if (user && (AUTH_ROUTES.includes(pathname) || pathname === "/")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/digest";
+    return NextResponse.redirect(url);
   }
 
   return supabaseResponse;
