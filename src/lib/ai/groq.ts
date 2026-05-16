@@ -2,15 +2,21 @@ import Groq from "groq-sdk";
 import type { RawArticle, Profile, ImpactLevel } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const GROQ_MODEL = "llama-3.1-8b-instant";
+
+// Lazy singleton — only instantiated on first server-side call, never at module load
+let _groq: Groq | null = null;
+function getGroq(): Groq {
+  if (!_groq) _groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  return _groq;
+}
 
 export async function callGroq(
   prompt: string,
   systemPrompt: string,
   maxTokens = 200
 ): Promise<string> {
-  const completion = await groq.chat.completions.create({
+  const completion = await getGroq().chat.completions.create({
     model: GROQ_MODEL,
     messages: [
       { role: "system", content: systemPrompt },

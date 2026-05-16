@@ -78,6 +78,9 @@ export const RSS_FEEDS = [
 
 export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DATA_MODE === 'demo'
 
+// Sentinel value used in impactAnalysis to indicate quota was exceeded
+export const GEMINI_QUOTA_EXCEEDED = "__GEMINI_QUOTA_EXCEEDED__"
+
 export const APP_NAME = 'Briefd'
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 export const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'digest@briefd.app'

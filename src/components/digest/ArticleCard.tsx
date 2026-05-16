@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { ScoredArticle } from "@/lib/types";
-import { GEMINI_QUOTA_EXCEEDED } from "@/lib/ai/summarise";
+import { GEMINI_QUOTA_EXCEEDED } from "@/lib/constants";
 import { useToast } from "@/components/ui/Toast";
 import { clsx } from "clsx";
 

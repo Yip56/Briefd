@@ -6,9 +6,10 @@ import {
   groqGetImpactAnalysis,
 } from "./groq";
 import { canMakeCall, recordGeminiCall } from "./budget";
+import { GEMINI_QUOTA_EXCEEDED as _QUOTA_CONST } from "@/lib/constants";
 
-// Kept as a sentinel value for backward compatibility — no longer returned in practice
-export const GEMINI_QUOTA_EXCEEDED = "__GEMINI_QUOTA_EXCEEDED__";
+// Re-export from constants so server-only callers can still import from here
+export const GEMINI_QUOTA_EXCEEDED = _QUOTA_CONST;
 export let geminiQuotaRetryAfter: string | null = null;
 
 export async function analyseArticle(
