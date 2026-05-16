@@ -1,35 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { groqExtractAvoidanceKeywords, groqUpdateProfile } from "./groq";
+import { callGroq, groqExtractAvoidanceKeywords, groqUpdateProfile } from "./groq";
 import { canMakeCall, recordGeminiCall } from "./budget";
-
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-async function callGemini(prompt: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return "";
-
-  const doRequest = () =>
-    fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-    });
-
-  let res = await doRequest();
-
-  if (res.status === 429) {
-    console.warn("[Gemini/feedback] Rate limited, retrying in 10s…");
-    await sleep(10_000);
-    res = await doRequest();
-  }
-
-  if (!res.ok) return "";
-  const data = await res.json();
-  return (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
-}
 
 export async function extractAvoidanceKeywords(
   title: string,
@@ -39,39 +10,26 @@ export async function extractAvoidanceKeywords(
   userId?: string,
   supabase?: SupabaseClient
 ): Promise<string[]> {
-  // Each feedback call uses a unique session so only daily budget applies
   const sessionId = `fb_${Date.now()}`;
 
   if (userId && supabase) {
     const allowed = await canMakeCall(userId, sessionId, supabase).catch(() => true);
     if (!allowed) {
-      console.log("[Budget] Exceeded — skipping Gemini for keyword extraction");
+      console.log("[Budget] Exceeded — skipping AI for keyword extraction");
       return [topic.toLowerCase()];
     }
   }
 
-  const prompt =
-    `A user disliked a news article. Extract 2-4 specific keywords or phrases that represent ` +
-    `what they want to avoid in future articles. Return a JSON array of strings only, no explanation. ` +
-    `Article title: ${title}. Topic: ${topic}. Reason selected: ${reason}. User comment: ${freeText}`;
-
   try {
-    const raw = await callGemini(prompt);
-    if (raw) {
-      console.log("[AI] Avoidance keywords via Gemini");
-      if (userId && supabase) {
-        await recordGeminiCall(userId, "feedback_keywords", sessionId, supabase).catch(() => {});
-      }
-      const match = raw.match(/\[[\s\S]*\]/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        if (Array.isArray(parsed)) return parsed.filter((k) => typeof k === "string");
-      }
+    const keywords = await groqExtractAvoidanceKeywords(title, reason, freeText, topic);
+    if (keywords.length > 0 && userId && supabase) {
+      await recordGeminiCall(userId, "feedback_keywords", sessionId, supabase).catch(() => {});
     }
-  } catch { /* fall through */ }
-
-  console.log("[AI] Gemini unavailable for keywords, falling back to Groq");
-  return groqExtractAvoidanceKeywords(title, reason, freeText, topic);
+    console.log("[AI] Avoidance keywords via Groq");
+    return keywords;
+  } catch {
+    return [topic.toLowerCase()];
+  }
 }
 
 export async function updateGeminiProfile(
@@ -87,39 +45,38 @@ export async function updateGeminiProfile(
 
   if (!feedbackRows || feedbackRows.length === 0) return;
 
+  const sessionId = `profile_${Date.now()}`;
+  const allowed = await canMakeCall(userId, sessionId, supabase).catch(() => true);
+  if (!allowed) {
+    console.log("[Budget] Exceeded — skipping AI for profile update");
+    return;
+  }
+
   const summary = feedbackRows.map((r) => {
     const art = r.articles as unknown as { title: string; topic: string } | null;
     return { vote: r.vote, reason: r.reason, comment: r.free_text, title: art?.title, topic: art?.topic };
   });
 
-  const sessionId = `profile_${Date.now()}`;
-  const allowed = await canMakeCall(userId, sessionId, supabase).catch(() => true);
-  if (!allowed) {
-    console.log("[Budget] Exceeded — skipping Gemini for profile update");
-    return;
-  }
-
+  const systemPrompt =
+    "You generate user preference profiles for a news app. Return plain text only, 3 sentences.";
   const prompt =
     `Based on this user's feedback history, write a 3-sentence profile describing their news ` +
     `preferences, what topics they care about, what they want to avoid, and their likely ` +
-    `occupation context. Be specific. Return plain text only. ` +
-    `Feedback data: ${JSON.stringify(summary)}`;
+    `occupation context. Be specific. Feedback data: ${JSON.stringify(summary)}`;
 
   try {
-    const profile = await callGemini(prompt);
-    if (profile) {
-      console.log("[AI] User profile via Gemini");
-      await recordGeminiCall(userId, "profile_update", sessionId, supabase).catch(() => {});
-      await supabase
-        .from("user_algorithm_settings")
-        .upsert(
-          { user_id: userId, gemini_profile: profile, updated_at: new Date().toISOString() },
-          { onConflict: "user_id" }
-        );
-      return;
-    }
-  } catch { /* fall through */ }
+    const aiProfile = await callGroq(prompt, systemPrompt, 300);
+    if (!aiProfile) return;
 
-  console.log("[AI] Gemini unavailable for profile, falling back to Groq");
-  await groqUpdateProfile(userId, supabase);
+    console.log("[AI] User profile via Groq");
+    await recordGeminiCall(userId, "profile_update", sessionId, supabase).catch(() => {});
+    await supabase
+      .from("user_algorithm_settings")
+      .upsert(
+        { user_id: userId, gemini_profile: aiProfile, updated_at: new Date().toISOString() },
+        { onConflict: "user_id" }
+      );
+  } catch {
+    await groqUpdateProfile(userId, supabase);
+  }
 }

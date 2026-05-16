@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { TopicPicker } from "@/components/onboarding/TopicPicker";
 import { KeywordInput } from "@/components/onboarding/KeywordInput";
 import { SchedulePicker } from "@/components/onboarding/SchedulePicker";
@@ -102,7 +102,7 @@ function AIUsageSection({ usage }: { usage: UsageData | null }) {
       {/* Row 1 — Daily budget */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-sm font-medium text-gray-700">Daily AI calls</span>
+          <span className="text-sm font-medium text-gray-700">Daily AI Calls (Groq)</span>
           <span className="text-sm font-mono text-gray-600">{dailyBudget.callsUsed} / {dailyBudget.callsLimit}</span>
         </div>
         <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden mb-1.5">
@@ -112,10 +112,10 @@ function AIUsageSection({ usage }: { usage: UsageData | null }) {
           />
         </div>
         <p className="text-xs text-gray-500">
-          {dailyBudget.callsUsed} of {dailyBudget.callsLimit} calls used today · Resets at {resetTime}
+          {dailyBudget.callsUsed} of {dailyBudget.callsLimit} AI calls used today · Resets at {resetTime}
         </p>
         <p style={{ fontFamily: "var(--font-dm-mono, monospace)" }} className="text-xs text-gray-400 mt-1">
-          Each digest refresh uses up to 10 calls (5 article analyses)
+          Each digest refresh uses up to 20 calls (5 article analyses)
         </p>
       </div>
 
@@ -151,7 +151,7 @@ function AIUsageSection({ usage }: { usage: UsageData | null }) {
         <ul className="space-y-1.5 text-xs text-gray-600">
           <li>✓ Articles are cached — each article is only analysed once ever</li>
           <li>✓ Low impact articles skip AI analysis entirely</li>
-          <li>↓ Reduce digest refreshes to save calls (each refresh = up to 10 calls)</li>
+          <li>↓ Reduce digest refreshes to save calls (each refresh = up to 20 AI calls)</li>
           <li>↓ Fewer selected topics = fewer articles to analyse</li>
           <li>↓ High Impact filter shows pre-analysed articles only</li>
         </ul>
@@ -201,6 +201,84 @@ function AIUsageSection({ usage }: { usage: UsageData | null }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+// ─── Data Source Toggle ───────────────────────────────────────────────────────
+
+function DataSourceToggle() {
+  const { showToast } = useToast();
+  const [mode, setMode]       = useState<"demo" | "live">("demo");
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings/data-mode")
+      .then((r) => r.json())
+      .then((d) => { if (d.mode) setMode(d.mode); })
+      .catch(() => {});
+  }, []);
+
+  async function toggle(newMode: "demo" | "live") {
+    if (newMode === mode || saving) return;
+    setSaving(true);
+    try {
+      await fetch("/api/settings/data-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: newMode }),
+      });
+      setMode(newMode);
+      showToast(`Switched to ${newMode === "demo" ? "Demo" : "Live"} mode — reload digest to apply`, "success");
+    } catch {
+      showToast("Could not save data mode", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl card-border p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="font-serif text-lg text-gray-900">Data Source</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Choose where Briefd loads articles from</p>
+        </div>
+        {/* Pill toggle */}
+        <div className="flex rounded-full border border-gray-200 overflow-hidden text-xs font-medium">
+          <button
+            type="button"
+            onClick={() => toggle("demo")}
+            disabled={saving}
+            className={`px-4 py-2 transition-colors ${mode === "demo" ? "bg-gray-900 text-white" : "bg-white text-gray-500 hover:text-gray-700"}`}
+          >
+            Demo Data
+          </button>
+          <button
+            type="button"
+            onClick={() => toggle("live")}
+            disabled={saving}
+            className={`px-4 py-2 transition-colors ${mode === "live" ? "bg-gray-900 text-white" : "bg-white text-gray-500 hover:text-gray-700"}`}
+          >
+            Live Data
+          </button>
+        </div>
+      </div>
+      {mode === "demo" ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+          <span className="text-xs font-semibold text-emerald-700 tracking-wide uppercase">Demo Mode</span>
+          <span className="text-xs text-emerald-600 ml-1">— using sample articles</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200">
+          <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+          <span className="text-xs font-semibold text-blue-700 tracking-wide uppercase">Live Mode</span>
+          <span className="text-xs text-blue-600 ml-1">— fetching real sources</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function SettingsPage() {
   const { showToast } = useToast();
 
@@ -223,6 +301,16 @@ export default function SettingsPage() {
   const [sendingTest, setSendingTest] = useState(false);
   const [loading,     setLoading]     = useState(true);
   const [usage,       setUsage]       = useState<UsageData | null>(null);
+  const [saveStatus,  setSaveStatus]  = useState<"idle" | "saving" | "saved">("idle");
+
+  const loadedRef  = useRef(false);
+  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Stable snapshot of all form values — changes when any field changes
+  const formSnapshot = useMemo(
+    () => JSON.stringify({ occupation, location, lifeStage, vehicle, digestTime, digestFrequency, emailEnabled, topicOrder, keywords }),
+    [occupation, location, lifeStage, vehicle, digestTime, digestFrequency, emailEnabled, topicOrder, keywords]
+  );
 
   useEffect(() => {
     fetch("/api/profile")
@@ -247,7 +335,11 @@ export default function SettingsPage() {
         setTopicOrder(presets);
         setKeywords(custom);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        // Allow auto-save to fire only after initial values are hydrated
+        setTimeout(() => { loadedRef.current = true; }, 0);
+      });
 
     // Fetch last email sent
     fetch("/api/email/log")
@@ -262,39 +354,56 @@ export default function SettingsPage() {
       .catch(() => {});
   }, []);
 
+  // Auto-save: fires 800ms after any form value changes
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setSaveStatus("saving");
+    setSaving(true);
+    timerRef.current = setTimeout(async () => {
+      const orderedPresets = topicOrder.map((topic, i) => ({ topic, weight: topicWeight(i), is_preset: true }));
+      const keywordTopics  = keywords.map((kw) => ({ topic: kw, weight: 1.0, is_preset: false }));
+      try {
+        await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            occupation, location, life_stage: lifeStage, vehicle,
+            topics: [...orderedPresets, ...keywordTopics],
+            digest_time: digestTime, digest_frequency: digestFrequency,
+            email_digest_enabled: emailEnabled,
+          }),
+        });
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        setSaveStatus("idle");
+      } finally {
+        setSaving(false);
+      }
+    }, 800);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formSnapshot]);
+
   function toggleTopic(topic: string) {
     const isSelected = selectedTopics.includes(topic);
     setSelectedTopics((prev) => isSelected ? prev.filter((t) => t !== topic) : [...prev, topic]);
     setTopicOrder((order) => isSelected ? order.filter((t) => t !== topic) : order.includes(topic) ? order : [...order, topic]);
   }
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const orderedPresets = topicOrder.map((topic, i) => ({ topic, weight: topicWeight(i), is_preset: true }));
-      const keywordTopics  = keywords.map((kw) => ({ topic: kw, weight: 1.0, is_preset: false }));
-
-      const res = await fetch("/api/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          occupation, location, life_stage: lifeStage, vehicle,
-          topics: [...orderedPresets, ...keywordTopics],
-          digest_time: digestTime, digest_frequency: digestFrequency,
-          email_digest_enabled: emailEnabled,
-        }),
-      });
-      showToast(res.ok ? "Preferences saved!" : "Failed to save", res.ok ? "success" : "error");
-    } catch {
-      showToast("Could not connect to server", "error");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleTestEmail() {
     setSendingTest(true);
     try {
+      // Flush pending auto-save so the API sees the current email toggle value
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email_digest_enabled: emailEnabled }),
+      });
       const res = await fetch("/api/email/send", { method: "POST" });
       showToast(
         res.ok ? "Test email sent! Check your inbox." : "Failed to send email",
@@ -321,6 +430,9 @@ export default function SettingsPage() {
         <h1 className="font-serif text-2xl text-gray-900">Settings</h1>
         <p className="text-sm text-gray-400 mt-1">Manage your digest preferences</p>
       </div>
+
+      {/* Data Source toggle — always at top */}
+      <DataSourceToggle />
 
       {/* Schedule */}
       <SectionCard title="Delivery schedule">
@@ -410,14 +522,19 @@ export default function SettingsPage() {
       {/* AI Usage */}
       <AIUsageSection usage={usage} />
 
-      {/* Save */}
+      {/* Auto-save status */}
       <div className="flex justify-end py-2">
-        <button
-          type="button" onClick={handleSave} disabled={saving}
-          className="px-6 py-2.5 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover disabled:opacity-60 transition-colors"
+        <span
+          style={{
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "11px",
+            letterSpacing: "0.06em",
+            color: saveStatus === "saved" ? "#1D5C3A" : "#9C9890",
+            transition: "color 0.3s",
+          }}
         >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
+          {saveStatus === "saving" ? "SAVING…" : saveStatus === "saved" ? "✓ SAVED" : ""}
+        </span>
       </div>
     </div>
   );

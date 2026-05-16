@@ -33,6 +33,7 @@ export function Navbar() {
   const navLinks = [
     { href: "/digest",    label: "TODAY'S DIGEST" },
     { href: "/algorithm", label: "MY ALGORITHM"   },
+    { href: "/archive",   label: "ARCHIVE"        },
     { href: "/settings",  label: "SETTINGS"       },
   ];
 

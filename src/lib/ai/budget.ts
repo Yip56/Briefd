@@ -26,9 +26,9 @@ export async function getDailyBudget(
 
   if (!row) {
     await supabase.from("gemini_daily_budget").insert({
-      user_id: userId, date: today, calls_used: 0, calls_limit: 25,
+      user_id: userId, date: today, calls_used: 0, calls_limit: 100,
     });
-    return { callsUsed: 0, callsLimit: 25, remaining: 25, resetAt };
+    return { callsUsed: 0, callsLimit: 100, remaining: 100, resetAt };
   }
 
   if (row.date !== today) {
@@ -52,7 +52,7 @@ export async function getDigestBudget(
   sessionId: string,
   supabase: SupabaseClient
 ): Promise<{ callsUsed: number; callsLimit: number; remaining: number }> {
-  const DIGEST_CAP = 10;
+  const DIGEST_CAP = 20;
   const { count } = await supabase
     .from("gemini_usage")
     .select("id", { count: "exact", head: true })

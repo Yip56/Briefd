@@ -119,6 +119,7 @@ export interface DigestResult {
   totalScored: number
   geminiQuotaRetryAfter?: string | null
   queueStats?: QueueStats
+  isDemo?: boolean
 }
 
 export interface UserAlgorithmSettings {
@@ -135,6 +136,7 @@ export interface UserAlgorithmSettings {
   avoidance_keywords: Array<{ keyword: string; points: number }>
   gemini_profile: string
   topic_composition: Record<string, number>
+  data_mode?: string
   updated_at: string
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildArticleQueue } from "@/lib/queue/buildQueue";
 import { geminiQuotaRetryAfter } from "@/lib/ai/summarise";
+import { IS_DEMO_MODE } from "@/lib/constants";
 import type { ImpactLevel, ScoredArticle, VoteValue, QueueStats, DigestResult } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +82,8 @@ async function fetchUnservedBatch(userId: string, supabase: SupabaseInstance, li
 async function buildDigestResponse(
   userId: string,
   feedbackMap: Record<string, VoteValue>,
-  supabase: SupabaseInstance
+  supabase: SupabaseInstance,
+  isDemo = false
 ): Promise<DigestResult> {
   const batch    = await fetchUnservedBatch(userId, supabase, BATCH_SIZE);
   const articles = batch.map((row) => rowToScoredArticle(row, feedbackMap)).filter(Boolean) as ScoredArticle[];
@@ -102,6 +104,7 @@ async function buildDigestResponse(
     totalScored:           totalQueued,
     geminiQuotaRetryAfter,
     queueStats,
+    isDemo,
   };
 }
 
@@ -110,6 +113,11 @@ export async function GET(request: NextRequest) {
   const refreshParam  = request.nextUrl.searchParams.get("refresh");
   const isRefreshTrue = refreshParam === "true";
   const isRefreshNew  = refreshParam === "new";
+
+  // Determine demo/live mode: cookie overrides global env
+  const cookieMode = request.cookies.get("briefd_data_mode")?.value;
+  const isDemo     = cookieMode === "live" ? false : cookieMode === "demo" ? true : IS_DEMO_MODE;
+  console.log(`[Briefd] Data mode: ${isDemo ? "demo" : "live"}`);
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -153,8 +161,8 @@ export async function GET(request: NextRequest) {
       .eq("user_id", user.id)
       .eq("served", false);
 
-    await buildArticleQueue(user.id, preferences, algorithmSettings, feedbackMap, clickedUrls, supabase);
-    return NextResponse.json(await buildDigestResponse(user.id, feedbackMap, supabase));
+    await buildArticleQueue(user.id, preferences, algorithmSettings, feedbackMap, clickedUrls, supabase, isDemo);
+    return NextResponse.json(await buildDigestResponse(user.id, feedbackMap, supabase, isDemo));
   }
 
   // ── Refresh=true: archive current batch, advance to next ─────────────────
@@ -181,17 +189,17 @@ export async function GET(request: NextRequest) {
 
     const remaining = await fetchUnservedBatch(user.id, supabase, BATCH_SIZE);
     if (remaining.length < BATCH_SIZE) {
-      await buildArticleQueue(user.id, preferences, algorithmSettings, feedbackMap, clickedUrls, supabase);
+      await buildArticleQueue(user.id, preferences, algorithmSettings, feedbackMap, clickedUrls, supabase, isDemo);
     }
 
-    return NextResponse.json(await buildDigestResponse(user.id, feedbackMap, supabase));
+    return NextResponse.json(await buildDigestResponse(user.id, feedbackMap, supabase, isDemo));
   }
 
   // ── Initial load ──────────────────────────────────────────────────────────
   const unserved = await fetchUnservedBatch(user.id, supabase, BATCH_SIZE);
   if (unserved.length < BATCH_SIZE) {
-    await buildArticleQueue(user.id, preferences, algorithmSettings, feedbackMap, clickedUrls, supabase);
+    await buildArticleQueue(user.id, preferences, algorithmSettings, feedbackMap, clickedUrls, supabase, isDemo);
   }
 
-  return NextResponse.json(await buildDigestResponse(user.id, feedbackMap, supabase));
+  return NextResponse.json(await buildDigestResponse(user.id, feedbackMap, supabase, isDemo));
 }

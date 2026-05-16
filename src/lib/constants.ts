@@ -76,6 +76,8 @@ export const RSS_FEEDS = [
   { name: 'EdgeProp', url: 'https://www.edgeprop.my/rss.xml', topic: 'Property' },
 ] as const
 
+export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DATA_MODE === 'demo'
+
 export const APP_NAME = 'Briefd'
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
 export const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? 'digest@briefd.app'

@@ -5,6 +5,7 @@ import { fetchAllSources } from "@/lib/sources";
 import { scoreArticles } from "@/lib/scoring/ranker";
 import { analyseArticle } from "@/lib/ai/summarise";
 import type { EnrichmentCache } from "@/lib/ai/digest";
+import { DEMO_ARTICLES } from "@/lib/demo/articles";
 
 const DIGEST_SIZE = 5;
 
@@ -111,26 +112,43 @@ export async function buildArticleQueue(
   algorithmSettings: UserAlgorithmSettings | null,
   feedbackMap: Record<string, VoteValue>,
   clickedUrls: Set<string>,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  isDemoMode = false
 ): Promise<void> {
   const topicNames    = preferences.topics.map((t) => t.topic);
   const composition   = algorithmSettings?.topic_composition ?? {};
   const geminiProfile = algorithmSettings?.gemini_profile ?? "";
   const sessionId     = crypto.randomUUID();
 
-  const rawArticles = await fetchAllSources(topicNames);
+  let rawArticles;
+  if (isDemoMode) {
+    rawArticles = DEMO_ARTICLES;
+    console.log("[Briefd] Data mode: demo");
+  } else {
+    rawArticles = await fetchAllSources(topicNames);
+    console.log("[Briefd] Data mode: live");
+  }
+  console.log(`[Queue] sources → ${rawArticles.length} raw articles`);
 
-  const articleRows = rawArticles.map((a) => ({
-    external_id:  a.externalId,
-    title:        a.title,
-    summary:      a.summary,
-    source_name:  a.sourceName,
-    source_url:   a.sourceUrl,
-    article_url:  a.articleUrl,
-    topic:        a.topic,
-    published_at: a.publishedAt,
-    is_video:     a.isVideo ?? false,
-  }));
+  // Deduplicate by external_id — PostgreSQL refuses to update the same row twice in one upsert batch
+  const seenExtIds = new Set<string>();
+  const articleRows = rawArticles
+    .map((a) => ({
+      external_id:  a.externalId,
+      title:        a.title,
+      summary:      a.summary,
+      source_name:  a.sourceName,
+      source_url:   a.sourceUrl,
+      article_url:  a.articleUrl,
+      topic:        a.topic,
+      published_at: a.publishedAt,
+      is_video:     a.isVideo ?? false,
+    }))
+    .filter((row) => {
+      if (!row.external_id || seenExtIds.has(row.external_id)) return false;
+      seenExtIds.add(row.external_id);
+      return true;
+    });
 
   const { data: upsertedArticles, error: upsertError } = await supabase
     .from("articles")
@@ -141,11 +159,13 @@ export async function buildArticleQueue(
     console.error("[Queue] Article upsert failed:", upsertError.message);
     return;
   }
+  console.log(`[Queue] upsert → ${upsertedArticles?.length ?? 0} rows returned`);
 
   const idMap = new Map<string, string>();
   for (const row of upsertedArticles ?? []) {
     if (row.external_id) idMap.set(row.external_id, row.id);
   }
+  console.log(`[Queue] idMap size: ${idMap.size}`);
 
   const externalIds = (upsertedArticles ?? []).map((a) => a.external_id).filter(Boolean) as string[];
   const { data: cachedRows } = externalIds.length > 0
@@ -161,21 +181,44 @@ export async function buildArticleQueue(
   );
 
   const scored = scoreArticles(rawArticles, preferences, feedbackMap, algorithmSettings, clickedUrls);
+  console.log(`[Queue] scored: ${scored.length}`);
 
-  const { data: existingQueue } = await supabase
+  // Only block articles already sitting in the unserved queue — served articles can be re-added
+  const { data: existingQueue, error: existingQueueError } = await supabase
     .from("article_queue")
     .select("article_id")
-    .eq("user_id", userId);
+    .eq("user_id", userId)
+    .eq("served", false);
+
+  if (existingQueueError) console.error("[Queue] existingQueue error:", existingQueueError.message);
 
   const existingArticleIds = new Set((existingQueue ?? []).map((r) => r.article_id));
+  console.log(`[Queue] existingArticleIds (unserved): ${existingArticleIds.size}`);
 
+  // When the queue is fully exhausted, purge served rows so the same articles can be re-queued
+  // and the table doesn't grow unboundedly.
+  if (existingArticleIds.size === 0) {
+    const { error: deleteError } = await supabase
+      .from("article_queue")
+      .delete()
+      .eq("user_id", userId)
+      .eq("served", true);
+    if (deleteError) console.error("[Queue] Delete served rows error:", deleteError.message);
+    else console.log("[Queue] Purged served rows");
+  }
+
+  const seenNewExtIds = new Set<string>();
   const newArticles = scored.filter((a) => {
-    const articleId = idMap.get(a.external_id ?? a.id);
+    const extId = a.external_id ?? a.id;
+    if (seenNewExtIds.has(extId)) return false;
+    seenNewExtIds.add(extId);
+    const articleId = idMap.get(extId);
     return articleId && !existingArticleIds.has(articleId);
   });
+  console.log(`[Queue] newArticles after filter: ${newArticles.length}`);
 
   if (newArticles.length === 0) {
-    console.log("[Queue] No new articles to add");
+    console.log("[Queue] No new articles to add — idMap empty or all blocked");
     return;
   }
 
@@ -208,11 +251,15 @@ export async function buildArticleQueue(
     })
     .filter(Boolean) as object[];
 
-  const { data: insertedRows } = await supabase
+  const { data: insertedRows, error: insertError } = await supabase
     .from("article_queue")
     .insert(queueRows)
     .select("id, article_id, position");
 
+  if (insertError) {
+    console.error("[Queue] Insert failed:", insertError.message);
+    return;
+  }
   if (!insertedRows || insertedRows.length === 0) return;
 
   const articleIdToQueueId = new Map(
@@ -271,14 +318,31 @@ export async function buildArticleQueue(
       .eq("external_id", extId);
   }
 
-  // First DIGEST_SIZE articles: enrich immediately; next batch: enrich after response
-  const immediate  = queued.slice(0, DIGEST_SIZE);
-  const background = queued.slice(DIGEST_SIZE, DIGEST_SIZE * 3);
-
-  await runBatched(immediate, 3, 4_000, enrichArticle);
-
-  if (background.length > 0) {
-    after(() => runBatched(background, 3, 4_000, enrichArticle));
+  if (isDemoMode) {
+    // Demo mode: set article summaries directly — no AI calls
+    const demoEnrich = async (article: ScoredArticle) => {
+      const extId   = article.external_id ?? article.id;
+      const artId   = idMap.get(extId);
+      const queueId = artId ? articleIdToQueueId.get(artId) : undefined;
+      if (!queueId) return;
+      await supabase
+        .from("article_queue")
+        .update({
+          ai_summary:      article.summary?.slice(0, 200) ?? article.title,
+          impact_analysis: article.impactLevel !== "low" ? `This ${article.topic} news may affect your finances and daily life.` : null,
+          impact_level:    article.impactLevel,
+        })
+        .eq("id", queueId);
+    };
+    await runBatched(queued, 5, 0, demoEnrich);
+  } else {
+    // First DIGEST_SIZE articles: enrich immediately; next batch: enrich after response
+    const immediate  = queued.slice(0, DIGEST_SIZE);
+    const background = queued.slice(DIGEST_SIZE, DIGEST_SIZE * 3);
+    await runBatched(immediate, 3, 4_000, enrichArticle);
+    if (background.length > 0) {
+      after(() => runBatched(background, 3, 4_000, enrichArticle));
+    }
   }
 
   console.log(
