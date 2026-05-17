@@ -239,9 +239,10 @@ export default function AlgorithmPage() {
   const [settings,  setSettings]  = useState<Settings>(DEFAULTS);
   const [topics,    setTopics]    = useState<string[]>([]);
   const [composition, setComposition] = useState<Record<string, number>>({});
-  const [loading,   setLoading]   = useState(true);
-  const [saving,    setSaving]    = useState(false);
-  const [regen,     setRegen]     = useState(false);
+  const [loading,    setLoading]    = useState(true);
+  const [saving,     setSaving]     = useState(false);
+  const [regen,      setRegen]      = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -306,13 +307,18 @@ export default function AlgorithmPage() {
 
   async function handleRegenProfile() {
     setRegen(true);
+    setRegenError(null);
     try {
       const res  = await fetch("/api/algorithm/regenerate-profile", { method: "POST" });
       const data = await res.json();
+      if (!res.ok) {
+        setRegenError(data.error ?? `Server error ${res.status}`);
+        return;
+      }
       setSettings((s) => ({ ...s, gemini_profile: data.gemini_profile ?? s.gemini_profile }));
       showToast("Profile regenerated", "success");
-    } catch {
-      showToast("Failed to regenerate profile", "error");
+    } catch (err) {
+      setRegenError(err instanceof Error ? err.message : "Unexpected error");
     } finally {
       setRegen(false);
     }
@@ -398,24 +404,29 @@ export default function AlgorithmPage() {
         />
       </section>
 
-      {/* Section 5 — Gemini profile */}
+      {/* Section 5 — AI profile */}
       <section className="mb-10">
-        <h2 className="text-[15px] font-semibold text-gray-800 mb-1">Your Gemini profile</h2>
+        <h2 className="text-[15px] font-semibold text-gray-800 mb-1">Your AI-generated preference profile</h2>
         <p className="text-xs text-gray-400 mb-2">
-          Gemini uses this to personalise your impact analysis. It updates automatically as you give feedback.
+          Auto-updates when you dislike articles. Click Regenerate to update manually.
         </p>
         <textarea
           readOnly
-          value={settings.gemini_profile || "No profile yet — give some feedback to generate one."}
-          rows={4}
-          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none text-gray-600 bg-gray-50 focus:outline-none"
+          value={settings.gemini_profile || "No profile yet — dislike some articles first, then click Regenerate."}
+          className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 resize-none text-gray-500 bg-gray-50 focus:outline-none"
+          style={{ minHeight: "100px" }}
         />
         <button
-          type="button" onClick={handleRegenProfile} disabled={regen}
-          className="mt-2 text-sm text-brand hover:underline disabled:opacity-50"
+          type="button"
+          onClick={handleRegenProfile}
+          disabled={regen}
+          className="mt-3 w-full py-2.5 bg-brand text-white text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {regen ? "Regenerating…" : "Regenerate profile"}
+          {regen ? "Generating…" : "↻ Regenerate AI Profile"}
         </button>
+        {regenError && (
+          <p className="mt-2 text-xs text-red-500">{regenError}</p>
+        )}
       </section>
 
       {/* Save */}
