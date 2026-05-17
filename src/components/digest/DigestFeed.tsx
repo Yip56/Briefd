@@ -6,8 +6,8 @@ import { ArticleCard } from "./ArticleCard";
 import { DigestSkeleton } from "./DigestSkeleton";
 import { DigestErrorBoundary } from "./DigestErrorBoundary";
 import { useToast } from "@/components/ui/Toast";
+import { AiBudgetBanner } from "@/components/ui/AiBudgetBanner";
 import type { DigestResult, ScoredArticle, DigestArchive } from "@/lib/types";
-import { GEMINI_QUOTA_EXCEEDED } from "@/lib/constants";
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -118,6 +118,244 @@ function NewspaperGrid({
   );
 }
 
+// ─── More Articles panel (demo mode only) ─────────────────────────────────────
+
+function MoreArticlesPanel({
+  articles,
+  totalScored,
+}: {
+  articles: ScoredArticle[];
+  totalScored: number;
+}) {
+  const [expanded,    setExpanded]    = useState(true);
+  const [panelTopic,  setPanelTopic]  = useState<string | null>(null);
+
+  const uniqueTopics = [...new Set(articles.map((a) => a.topic).filter(Boolean))] as string[];
+
+  const visible = panelTopic === null
+    ? articles
+    : articles.filter((a) => a.topic === panelTopic);
+
+  return (
+    <div style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid rgba(0,0,0,0.1)" }}>
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+        <span
+          style={{
+            fontFamily: "var(--font-dm-mono), monospace",
+            fontSize: "10px",
+            letterSpacing: "0.1em",
+            color: "#5C5750",
+            textTransform: "uppercase",
+          }}
+        >
+          More Articles ({articles.length})
+        </span>
+        {articles.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            style={{
+              fontFamily: "var(--font-dm-mono), monospace",
+              fontSize: "12px",
+              color: "#9C9890",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "0",
+              transition: "color 0.15s",
+            }}
+            className="hover:text-[#5C5750]"
+          >
+            {expanded ? "Hide additional articles ↑" : `Show all ${articles.length} additional articles ↓`}
+          </button>
+        )}
+      </div>
+
+      {/* Topic filter bar */}
+      {articles.length > 0 && uniqueTopics.length > 1 && (
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px", flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontFamily: "var(--font-dm-mono), monospace",
+              fontSize: "11px",
+              color: "#9C9890",
+              flexShrink: 0,
+            }}
+          >
+            Filter:
+          </span>
+          {["All", ...uniqueTopics].map((t) => {
+            const isActive = t === "All" ? panelTopic === null : panelTopic === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setPanelTopic(t === "All" ? null : t)}
+                style={{
+                  fontFamily: "var(--font-dm-mono), monospace",
+                  fontSize: "10px",
+                  letterSpacing: "0.04em",
+                  padding: "3px 8px",
+                  border: "1px solid",
+                  borderColor: isActive ? "#1D5C3A" : "rgba(0,0,0,0.12)",
+                  background: isActive ? "#1D5C3A" : "#F0ECE4",
+                  color: isActive ? "#fff" : "#5C5750",
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  borderRadius: "2px",
+                }}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {articles.length === 0 && (
+        <p style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "12px", color: "#9C9890" }}>
+          All {totalScored} demo articles are shown above based on your current topic selection. Try adding more topics in Settings to see more articles here.
+        </p>
+      )}
+
+      {/* Article list with max-height transition */}
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: expanded ? "9999px" : "0",
+          transition: "max-height 0.3s ease",
+        }}
+      >
+        {visible.length > 0 && (
+          <div
+            style={{
+              border: "0.5px solid rgba(0,0,0,0.12)",
+              borderRadius: "8px",
+              padding: "0 16px",
+              background: "#F7F4EF",
+            }}
+          >
+            {visible.map((article, i) => {
+              const pubDate = article.published_at
+                ? new Date(article.published_at).toLocaleDateString("en-MY", { day: "numeric", month: "short" })
+                : null;
+              return (
+                <div
+                  key={article.id}
+                  style={{
+                    padding: "14px 0",
+                    borderBottom: i < visible.length - 1 ? "1px solid rgba(0,0,0,0.07)" : "none",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
+                    {article.topic && (
+                      <span
+                        style={{
+                          fontFamily: "var(--font-dm-mono), monospace",
+                          fontSize: "9px",
+                          letterSpacing: "0.08em",
+                          color: "#1D5C3A",
+                          background: "#e8f5ee",
+                          padding: "2px 6px",
+                          textTransform: "uppercase",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {article.topic}
+                      </span>
+                    )}
+                    {article.impactLevel === "high" && (
+                      <span style={{ fontSize: "11px", flexShrink: 0 }}>⚡</span>
+                    )}
+                    <a
+                      href={article.article_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontFamily: "var(--font-playfair), Georgia, serif",
+                        fontSize: "14px",
+                        fontWeight: 700,
+                        color: "#0F0E0C",
+                        textDecoration: "none",
+                        lineHeight: 1.3,
+                        flex: 1,
+                        minWidth: 0,
+                        transition: "color 0.15s",
+                      }}
+                      className="hover:text-[#1D5C3A]"
+                    >
+                      {article.title}
+                    </a>
+                    <a
+                      href={article.article_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontFamily: "var(--font-dm-mono), monospace",
+                        fontSize: "10px",
+                        color: "#1D5C3A",
+                        flexShrink: 0,
+                        marginTop: "2px",
+                      }}
+                    >
+                      Read →
+                    </a>
+                  </div>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-source-serif), Georgia, serif",
+                      fontSize: "13px",
+                      color: "#5C5750",
+                      lineHeight: 1.6,
+                      marginBottom: "6px",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {article.combined || article.summary}
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    {article.source_name && (
+                      <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "9px", color: "#9C9890" }}>
+                        {article.source_name}
+                      </span>
+                    )}
+                    {pubDate && (
+                      <span style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "9px", color: "#9C9890" }}>
+                        {pubDate}
+                      </span>
+                    )}
+                    <span
+                      style={{
+                        fontFamily: "var(--font-dm-mono), monospace",
+                        fontSize: "9px",
+                        color: "#C0BBB4",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      score: {Math.round(article.relevanceScore)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {visible.length === 0 && articles.length > 0 && (
+          <p style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "12px", color: "#9C9890", padding: "8px 0" }}>
+            No additional articles match the selected topic filter.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Past digests accordion ───────────────────────────────────────────────────
 
 function ArchiveArticleRow({ article }: { article: ScoredArticle }) {
@@ -176,7 +414,7 @@ function ArchiveArticleRow({ article }: { article: ScoredArticle }) {
           overflow: "hidden",
         }}
       >
-        {article.aiSummary || article.summary}
+        {article.combined || article.summary}
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
         {article.source_name && (
@@ -576,17 +814,36 @@ function DigestFeedInner() {
           >
             BRIEFD
           </span>
-          <span
-            style={{
-              fontFamily: "var(--font-dm-mono), monospace",
-              fontSize: "10px",
-              letterSpacing: "0.1em",
-              color: "#5C5750",
-              textTransform: "uppercase",
-            }}
-          >
-            PERSONAL EDITION
-          </span>
+          {digest?.isDemo ? (
+            <a
+              href="/settings"
+              style={{
+                fontFamily: "var(--font-dm-mono), monospace",
+                fontSize: "9px",
+                letterSpacing: "0.08em",
+                color: "#C9972A",
+                background: "#FDF8ED",
+                border: "1px solid #C9972A",
+                padding: "3px 8px",
+                textDecoration: "none",
+                textTransform: "uppercase",
+              }}
+            >
+              📋 DEMO MODE
+            </a>
+          ) : (
+            <span
+              style={{
+                fontFamily: "var(--font-dm-mono), monospace",
+                fontSize: "10px",
+                letterSpacing: "0.1em",
+                color: "#5C5750",
+                textTransform: "uppercase",
+              }}
+            >
+              PERSONAL EDITION
+            </span>
+          )}
         </div>
 
         {/* Thin rule */}
@@ -608,68 +865,10 @@ function DigestFeedInner() {
         <div style={{ borderBottom: "2px solid #0F0E0C", marginBottom: "24px" }} />
       </div>
 
-      {/* ── Demo mode banner ── */}
-      {digest?.isDemo && (
-        <div
-          style={{
-            marginBottom: "12px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "10px 14px",
-            background: "#F0FAF4",
-            borderLeft: "3px solid #16A34A",
-            fontFamily: "var(--font-source-serif), Georgia, serif",
-            fontSize: "13px",
-            color: "#166534",
-          }}
-        >
-          <span>📋</span>
-          <span>
-            <strong>Demo mode</strong> — showing sample articles.{" "}
-            <a href="/settings" style={{ color: "#16A34A", textDecoration: "underline" }}>
-              Switch to Live in Settings.
-            </a>
-          </span>
-        </div>
-      )}
+      {/* ── AI budget exhausted banner ── */}
+      {digest?.aiBudgetExhausted && <AiBudgetBanner />}
 
       {/* ── Banners / meta ── */}
-      {articles.some((a) => a.impactAnalysis === GEMINI_QUOTA_EXCEEDED) && (
-        <div
-          style={{
-            marginBottom: "16px",
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "10px",
-            padding: "12px 16px",
-            background: "#FDF8ED",
-            borderLeft: "3px solid #C9972A",
-          }}
-        >
-          <span>⚡</span>
-          <div style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "13px", color: "#5C4A00" }}>
-            <strong>Impact analysis paused</strong>
-            {" — "}your Gemini API quota is exceeded.{" "}
-            {digest?.geminiQuotaRetryAfter && (
-              <span>
-                Resets on{" "}
-                <strong>
-                  {new Date(digest.geminiQuotaRetryAfter).toLocaleDateString("en-MY", {
-                    day: "numeric", month: "long", year: "numeric",
-                  })}
-                </strong>
-                .{" "}
-              </span>
-            )}
-            Top up at{" "}
-            <a href="https://aistudio.google.com/billing" target="_blank" rel="noopener noreferrer" style={{ color: "#C9972A", textDecoration: "underline" }}>
-              aistudio.google.com/billing
-            </a>.
-          </div>
-        </div>
-      )}
-
       {showRefreshBanner && queueStats && (
         <div
           style={{
@@ -860,8 +1059,15 @@ function DigestFeedInner() {
         </div>
       )}
 
-      {/* ── Past digests ── */}
-      <PastDigests />
+      {/* ── More Articles panel (demo) / Past digests (live) ── */}
+      {digest?.isDemo ? (
+        <MoreArticlesPanel
+          articles={digest.remainingArticles ?? []}
+          totalScored={digest.totalScored}
+        />
+      ) : (
+        <PastDigests />
+      )}
     </div>
   );
 }
