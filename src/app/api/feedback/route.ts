@@ -15,6 +15,10 @@ export async function POST(request: NextRequest) {
     freeText?: string;
     articleTopic?: string;
     articleTitle?: string;
+    articleUrl?: string;
+    sourceName?: string;
+    summary?: string;
+    publishedAt?: string;
   };
   try {
     body = await request.json();
@@ -22,9 +26,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { articleId, vote, reason, freeText, articleTopic, articleTitle } = body;
+  const { articleId, vote, reason, freeText, articleTopic, articleTitle, articleUrl, sourceName, summary, publishedAt } = body;
   if (!articleId || (vote !== "up" && vote !== "down")) {
     return NextResponse.json({ error: "articleId and vote ('up'|'down') are required" }, { status: 400 });
+  }
+
+  // Non-UUID means a demo article (e.g. "demo_027"). Upsert it into the articles table
+  // to get a real UUID, then record feedback normally so profile regeneration works.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let resolvedArticleId = articleId;
+  if (!UUID_RE.test(articleId)) {
+    if (!articleUrl || !articleTitle) {
+      return NextResponse.json({ success: true, demo: true });
+    }
+    const { data: upserted, error: upsertErr } = await supabase
+      .from("articles")
+      .upsert(
+        {
+          external_id:  articleId,
+          title:        articleTitle,
+          summary:      summary ?? "",
+          source_name:  sourceName ?? null,
+          source_url:   null,
+          article_url:  articleUrl,
+          topic:        articleTopic ?? null,
+          published_at: publishedAt || null,
+          fetched_at:   new Date().toISOString(),
+        },
+        { onConflict: "external_id" }
+      )
+      .select("id")
+      .single();
+    if (upsertErr || !upserted?.id) {
+      console.error("[Feedback] Demo article upsert failed:", upsertErr?.message);
+      return NextResponse.json({ success: true, demo: true });
+    }
+    resolvedArticleId = upserted.id;
   }
 
   const { error } = await supabase
@@ -32,7 +69,7 @@ export async function POST(request: NextRequest) {
     .upsert(
       {
         user_id:    user.id,
-        article_id: articleId,
+        article_id: resolvedArticleId,
         vote,
         reason:     reason ?? null,
         free_text:  freeText ?? null,
@@ -90,7 +127,7 @@ export async function POST(request: NextRequest) {
     updateGeminiProfile(user.id, supabase).catch(() => {});
   }
 
-  return NextResponse.json({ success: true, removedArticleId: articleId });
+  return NextResponse.json({ success: true, removedArticleId: resolvedArticleId });
 }
 
 // GET handler for email one-click feedback links:
@@ -104,7 +141,8 @@ export async function GET(request: NextRequest) {
   const vote      = params.get("vote");
   const redirect  = params.get("redirect") ?? "/";
 
-  if (user && articleId && (vote === "up" || vote === "down")) {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (user && articleId && UUID_RE.test(articleId) && (vote === "up" || vote === "down")) {
     await supabase
       .from("article_feedback")
       .upsert(

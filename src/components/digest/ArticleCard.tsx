@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import type { ScoredArticle } from "@/lib/types";
-import { GEMINI_QUOTA_EXCEEDED } from "@/lib/constants";
 import { useToast } from "@/components/ui/Toast";
 import { clsx } from "clsx";
 
@@ -33,62 +32,6 @@ function getReasonChips(topic: string | null): string[] {
   return ["Not relevant to me", "Already knew this", "Too long", "Other"];
 }
 
-function ImpactBlock({ text }: { text: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
-      { threshold: 0.2 }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  return (
-    <div
-      ref={ref}
-      className={`impact-block ${visible ? "visible" : ""}`}
-      style={{
-        background: "#FDF8ED",
-        borderLeft: "2px solid #F0A500",
-        padding: "10px 14px",
-        borderRadius: "2px",
-        marginBottom: "12px",
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "var(--font-dm-mono), monospace",
-          fontSize: "10px",
-          fontVariant: "small-caps",
-          color: "#B07800",
-          fontWeight: 500,
-          letterSpacing: "0.06em",
-          display: "block",
-          marginBottom: "4px",
-        }}
-      >
-        ⚡ Impacts you
-      </span>
-      <p
-        style={{
-          fontFamily: "var(--font-source-serif), Georgia, serif",
-          fontSize: "13px",
-          fontStyle: "italic",
-          color: "#5C4A00",
-          margin: 0,
-          lineHeight: 1.6,
-        }}
-      >
-        {text}
-      </p>
-    </div>
-  );
-}
 
 function TopicPill({ topic, isHigh }: { topic?: string | null; isHigh?: boolean }) {
   return (
@@ -145,10 +88,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
   const chips     = getReasonChips(article.topic);
   const readLabel = isVideo ? "WATCH VIDEO →" : "READ FULL ARTICLE →";
   const readLabelShort = isVideo ? "Watch →" : "Read →";
-  const summary   = article.aiSummary || article.summary || "";
-  const hasImpact = article.impactAnalysis &&
-    article.impactAnalysis !== "Impact analysis unavailable for this article." &&
-    article.impactAnalysis !== GEMINI_QUOTA_EXCEEDED;
+  const combined = article.combined || article.summary || "";
 
   async function handleUpvote() {
     const next = voted === "up" ? null : "up";
@@ -157,7 +97,16 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
       await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ articleId: article.external_id ?? article.id, vote: "up" }),
+        body: JSON.stringify({
+        articleId:    article.external_id ?? article.id,
+        vote:         "up",
+        articleTitle: article.title,
+        articleTopic: article.topic,
+        articleUrl:   article.article_url,
+        sourceName:   article.source_name ?? "",
+        summary:      article.summary ?? "",
+        publishedAt:  article.published_at ?? "",
+      }),
       });
     } catch {
       setVoted(voted);
@@ -178,6 +127,10 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
           freeText,
           articleTopic: article.topic,
           articleTitle: article.title,
+          articleUrl:   article.article_url,
+          sourceName:   article.source_name ?? "",
+          summary:      article.summary ?? "",
+          publishedAt:  article.published_at ?? "",
         }),
       });
       setShowPopup(false);
@@ -369,9 +322,8 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               overflow: "hidden",
             }}
           >
-            {summary}
+            {combined}{isHigh ? " ⚡" : ""}
           </p>
-          {hasImpact && <ImpactBlock text={article.impactAnalysis!} />}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               {article.source_name && (
@@ -446,9 +398,8 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               marginBottom: "12px",
             }}
           >
-            {summary}
+            {combined}{isHigh ? " ⚡" : ""}
           </p>
-          {hasImpact && <ImpactBlock text={article.impactAnalysis!} />}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {article.source_name && (
@@ -526,7 +477,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               overflow: "hidden",
             }}
           >
-            {summary}
+            {combined}{isHigh ? " ⚡" : ""}
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {article.source_name && (
@@ -613,7 +564,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
                 overflow: "hidden",
               }}
             >
-              {summary}
+              {combined}{isHigh ? " ⚡" : ""}
             </p>
           </div>
           <div
