@@ -30,7 +30,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\YLX\\\\briefd\" -Force)",
       "Bash(Select-Object Name, FullName)",
       "Bash(vercel *)",
-      "PowerShell(vercel *)"
+      "PowerShell(vercel *)",
+      "Bash(git push *)"
     ]
   }
 }
