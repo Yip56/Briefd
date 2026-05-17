@@ -174,3 +174,107 @@ h1, h2, h3, h4, h5, h6 {
 .card-border {
   border: 0.5px solid rgb(0 0 0 / 0.1);
 }
+
+/* ─── Hero page entrance animations ──────────────────────────────────── */
+
+@keyframes rulerExpand {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+@keyframes letterSpacingIn {
+  from { letter-spacing: 0.3em; opacity: 0; }
+  to   { letter-spacing: 0.15em; opacity: 1; }
+}
+
+@keyframes heroFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes heroFadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes heroScaleIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: rotate(1.5deg) translateY(0px); }
+  50%       { transform: rotate(1.5deg) translateY(-6px); }
+}
+
+@keyframes numberPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.15); color: var(--accent); }
+  100% { transform: scale(1); }
+}
+
+/* ─── Scroll-triggered reveal ─────────────────────────────────────────── */
+
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+.animate-on-scroll.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.number-pop.in-view {
+  animation: numberPop 0.4s ease-out 0.2s both;
+}
+
+/* ─── Feature panel images ────────────────────────────────────────────── */
+
+.feature-panel-img {
+  position: relative;
+  overflow: hidden;
+  height: 180px;
+  border-radius: 2px;
+}
+.feature-panel-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+.feature-panel-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.feature-panel-img:hover .feature-panel-overlay {
+  opacity: 1;
+}
+.feature-panel-label {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  font-family: var(--font-dm-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-transform: uppercase;
+  font-variant: small-caps;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75);
+  pointer-events: none;
+}
+
+/* ─── CTA arrow pulse ─────────────────────────────────────────────────── */
+
+.cta-arrow-char {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.cta-btn:hover .cta-arrow-char {
+  transform: translateX(4px);
+}
