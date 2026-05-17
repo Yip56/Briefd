@@ -89,6 +89,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
   const readLabel = isVideo ? "WATCH VIDEO →" : "READ FULL ARTICLE →";
   const readLabelShort = isVideo ? "Watch →" : "Read →";
   const combined = article.combined || article.summary || "";
+  const safeText = /[.!?]$/.test(combined.trimEnd()) ? combined : combined + "...";
 
   async function handleUpvote() {
     const next = voted === "up" ? null : "up";
@@ -316,13 +317,9 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               color: "#5C5750",
               lineHeight: 1.75,
               marginBottom: "16px",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
             }}
           >
-            {combined}{isHigh ? " ⚡" : ""}
+            {safeText}{isHigh ? " ⚡" : ""}
           </p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -398,7 +395,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               marginBottom: "12px",
             }}
           >
-            {combined}{isHigh ? " ⚡" : ""}
+            {safeText}{isHigh ? " ⚡" : ""}
           </p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -477,7 +474,7 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               overflow: "hidden",
             }}
           >
-            {combined}{isHigh ? " ⚡" : ""}
+            {safeText}{isHigh ? " ⚡" : ""}
           </p>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             {article.source_name && (
@@ -558,13 +555,9 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
                 fontSize: "13px",
                 color: "#5C5750",
                 lineHeight: 1.6,
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
               }}
             >
-              {combined}{isHigh ? " ⚡" : ""}
+              {safeText}{isHigh ? " ⚡" : ""}
             </p>
           </div>
           <div

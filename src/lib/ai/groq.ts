@@ -1,6 +1,13 @@
 import Groq from "groq-sdk";
 import type { RawArticle, Profile, ImpactLevel } from "@/lib/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { recordAiCall } from "./budget";
+
+export interface AiTracking {
+  userId: string;
+  sessionId: string;
+  supabase: SupabaseClient;
+}
 
 const GROQ_MODEL = "llama-3.1-8b-instant";
 
@@ -30,11 +37,11 @@ export async function callGroq(
 export async function analyseArticleGroq(
   article: RawArticle,
   userProfile: Profile,
-  aiProfile: string
-): Promise<{ summary: string; impactAnalysis: string; impactLevel: ImpactLevel }> {
+  aiProfile: string,
+  tracking?: AiTracking
+): Promise<{ combined: string; impactLevel: ImpactLevel }> {
   const fallback = {
-    summary: article.summary.slice(0, 120),
-    impactAnalysis: "Analysis unavailable.",
+    combined:    article.summary.slice(0, 150),
     impactLevel: "medium" as ImpactLevel,
   };
 
@@ -46,29 +53,35 @@ export async function analyseArticleGroq(
   const vehicle    = userProfile.vehicle    ?? "commuter";
 
   const systemPrompt =
-    "You are a personal news analyst for a Malaysian news digest app. Always address the reader as 'you' or 'your'. " +
-    "Only mention their profile details if DIRECTLY relevant to the article topic. " +
-    "Be specific — include actual numbers, prices, percentages, dates from the article. " +
-    "Never be generic. Never start with 'This article'.";
+    "You are a personal news analyst for a Malaysian news digest. " +
+    "Write in second person ('you'/'your'). Only mention the reader's profile if DIRECTLY relevant. " +
+    "Be specific with numbers and dates. Never start with 'This article'. Never be generic. " +
+    "Always write complete sentences. Never end mid-word or mid-sentence. " +
+    "If you are approaching the length limit, wrap up the sentence naturally.";
 
   const userPrompt =
-    `Analyse this news article for a reader who is: ${occupation} in ${location}, ${life_stage}, owns ${vehicle}.\n` +
-    (aiProfile ? `Reader preferences: ${aiProfile}\n\n` : "\n") +
+    `Reader profile: ${occupation} in ${location}, ${life_stage}, owns ${vehicle}.\n` +
+    (aiProfile ? `Preferences: ${aiProfile}\n\n` : "\n") +
     `Article: ${article.title}\n` +
     `Content: ${article.summary.slice(0, 400)}\n\n` +
-    `Reply with JSON only, no markdown:\n` +
-    `{"summary":"One clear sentence max 25 words summarising the key fact","impactAnalysis":"1-2 sentences starting with You or Your explaining direct personal impact with specific figures","impactLevel":"high or medium or low"}`;
+    `Respond with JSON only, no markdown, no code fences:\n` +
+    `{"combined":"Complete sentence combining what happened AND how it affects you AND when. Format: [What happened] — [direct impact on you] [specific date/timeframe if available]. Max 45 words. Must be a complete sentence.","impactLevel":"high or medium or low"}`;
 
   try {
-    const text = await callGroq(userPrompt, systemPrompt, 300);
+    const text  = await callGroq(userPrompt, systemPrompt, 400);
     const clean = text.replace(/```json\n?|\n?```/g, "").trim();
     const parsed = JSON.parse(clean);
     const level = (["high", "medium", "low"].includes(parsed.impactLevel)
       ? parsed.impactLevel : "medium") as ImpactLevel;
+
+    console.log("[Groq] Call complete, recording usage...");
+    if (tracking) {
+      await recordAiCall(tracking.userId, "article_analysis", tracking.sessionId, "groq", tracking.supabase).catch(() => {});
+    }
+
     return {
-      summary:        parsed.summary        ?? fallback.summary,
-      impactAnalysis: parsed.impactAnalysis ?? fallback.impactAnalysis,
-      impactLevel:    level,
+      combined:    parsed.combined ?? fallback.combined,
+      impactLevel: level,
     };
   } catch {
     return fallback;

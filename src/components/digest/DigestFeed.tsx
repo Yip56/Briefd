@@ -304,6 +304,7 @@ function MoreArticlesPanel({
                     </a>
                   </div>
                   <p
+                    title={article.combined || article.summary || undefined}
                     style={{
                       fontFamily: "var(--font-source-serif), Georgia, serif",
                       fontSize: "13px",
