@@ -1,6 +1,6 @@
 import type { RawArticle, UserPreferences, DigestResult, ScoredArticle, VoteValue, UserAlgorithmSettings } from "@/lib/types";
 
-export type EnrichmentCache = Map<string, { combined?: string | null }>;
+export type EnrichmentCache = Map<string, { aiSummary?: string | null; impactAnalysis?: string | null }>;
 import { scoreArticles } from "@/lib/scoring/ranker";
 
 const TOTAL_ARTICLES = 15;
@@ -107,9 +107,10 @@ export async function buildDigest(
           topic: article.topic ?? "",
           publishedAt: article.published_at ?? new Date().toISOString(),
         };
-        const cached  = enrichmentCache?.get(raw.externalId);
-        const combined = cached?.combined ?? raw.summary.slice(0, 200);
-        return { ...article, combined };
+        const cached       = enrichmentCache?.get(raw.externalId);
+        const aiSummary    = cached?.aiSummary ?? raw.summary.slice(0, 200);
+        const impactAnalysis = cached?.impactAnalysis ?? "";
+        return { ...article, aiSummary, impactAnalysis };
       }
   );
 

@@ -180,8 +180,9 @@ export function scoreArticles(
       fetched_at: now,
       relevanceScore: Math.max(0, score),
       impactLevel,
-      combined: raw.summary.slice(0, 200),
-      userVote: feedbackMap[raw.externalId] ?? null,
+      aiSummary:     raw.summary.slice(0, 200),
+      impactAnalysis: "",
+      userVote:       feedbackMap[raw.externalId] ?? null,
       _score: score,
     };
   });

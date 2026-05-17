@@ -2,12 +2,7 @@ import { DEMO_ARTICLES } from "./articles";
 import { scoreArticles } from "@/lib/scoring/ranker";
 import type { DigestResult, ScoredArticle, UserPreferences, UserAlgorithmSettings } from "@/lib/types";
 
-function buildDemoSentence(text: string): string {
-  if (text.length <= 180) return text;
-  const truncated = text.slice(0, 180);
-  const lastSpace = truncated.lastIndexOf(" ");
-  return (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated) + "...";
-}
+const demoMap = new Map(DEMO_ARTICLES.map((a) => [a.externalId, a]));
 
 export function buildDemoDigest(
   selectedTopics: string[],
@@ -22,10 +17,14 @@ export function buildDemoDigest(
   const scored = scoreArticles(topicFiltered, preferences, {}, algorithmSettings ?? undefined);
 
   const withText = (articles: ScoredArticle[]): ScoredArticle[] =>
-    articles.map((a) => ({
-      ...a,
-      combined: buildDemoSentence(a.summary || a.title),
-    }));
+    articles.map((a) => {
+      const demo = demoMap.get(a.external_id ?? a.id);
+      return {
+        ...a,
+        aiSummary:     demo?.demoSummary || (a.summary ?? "").slice(0, 150),
+        impactAnalysis: demo?.demoImpact || "",
+      };
+    });
 
   return {
     articles:          withText(scored.slice(0, 5)),

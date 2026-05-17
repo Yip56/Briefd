@@ -88,8 +88,9 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
   const chips     = getReasonChips(article.topic);
   const readLabel = isVideo ? "WATCH VIDEO →" : "READ FULL ARTICLE →";
   const readLabelShort = isVideo ? "Watch →" : "Read →";
-  const combined = article.combined || article.summary || "";
-  const safeText = /[.!?]$/.test(combined.trimEnd()) ? combined : combined + "...";
+  const aiSummary = article.aiSummary || article.summary || "";
+  const safeText  = /[.!?]$/.test(aiSummary.trimEnd()) ? aiSummary : aiSummary + "...";
+  const hasImpact = !!article.impactAnalysis && article.impactAnalysis !== "Impact analysis unavailable.";
 
   async function handleUpvote() {
     const next = voted === "up" ? null : "up";
@@ -316,11 +317,29 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               fontSize: "16px",
               color: "#5C5750",
               lineHeight: 1.75,
-              marginBottom: "16px",
+              marginBottom: hasImpact ? "12px" : "16px",
             }}
           >
-            {safeText}{isHigh ? " ⚡" : ""}
+            {safeText}
           </p>
+          {hasImpact && (
+            <div
+              style={{
+                background: "#FDF8ED",
+                borderLeft: "2px solid #F0A500",
+                borderRadius: "6px",
+                padding: "10px 14px",
+                marginBottom: "16px",
+              }}
+            >
+              <div style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "11px", letterSpacing: "0.06em", color: "#C9972A", textTransform: "uppercase", fontVariant: "small-caps", marginBottom: "4px" }}>
+                ⚡ Impacts you
+              </div>
+              <p style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "13px", fontStyle: "italic", color: "#5C4A00", lineHeight: 1.65, margin: 0 }}>
+                {article.impactAnalysis}
+              </p>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               {article.source_name && (
@@ -392,11 +411,29 @@ export function ArticleCard({ article, onRemove, variant = "list" }: ArticleCard
               fontSize: "14px",
               color: "#5C5750",
               lineHeight: 1.7,
-              marginBottom: "12px",
+              marginBottom: hasImpact ? "10px" : "12px",
             }}
           >
-            {safeText}{isHigh ? " ⚡" : ""}
+            {safeText}
           </p>
+          {hasImpact && (
+            <div
+              style={{
+                background: "#FDF8ED",
+                borderLeft: "2px solid #F0A500",
+                borderRadius: "6px",
+                padding: "8px 12px",
+                marginBottom: "12px",
+              }}
+            >
+              <div style={{ fontFamily: "var(--font-dm-mono), monospace", fontSize: "10px", letterSpacing: "0.06em", color: "#C9972A", textTransform: "uppercase", fontVariant: "small-caps", marginBottom: "3px" }}>
+                ⚡ Impacts you
+              </div>
+              <p style={{ fontFamily: "var(--font-source-serif), Georgia, serif", fontSize: "13px", fontStyle: "italic", color: "#5C4A00", lineHeight: 1.6, margin: 0 }}>
+                {article.impactAnalysis}
+              </p>
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {article.source_name && (

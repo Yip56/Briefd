@@ -304,7 +304,7 @@ function MoreArticlesPanel({
                     </a>
                   </div>
                   <p
-                    title={article.combined || article.summary || undefined}
+                    title={article.aiSummary || article.summary || undefined}
                     style={{
                       fontFamily: "var(--font-source-serif), Georgia, serif",
                       fontSize: "13px",
@@ -317,7 +317,7 @@ function MoreArticlesPanel({
                       overflow: "hidden",
                     }}
                   >
-                    {article.combined || article.summary}
+                    {article.aiSummary || article.summary}
                   </p>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     {article.source_name && (
@@ -415,7 +415,7 @@ function ArchiveArticleRow({ article }: { article: ScoredArticle }) {
           overflow: "hidden",
         }}
       >
-        {article.combined || article.summary}
+        {article.aiSummary || article.summary}
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
         {article.source_name && (

@@ -183,13 +183,13 @@ export async function buildArticleQueue(
   const { data: cachedRows } = externalIds.length > 0
     ? await supabase
         .from("articles")
-        .select("external_id, ai_summary")
+        .select("external_id, ai_summary, impact_analysis")
         .in("external_id", externalIds)
         .not("ai_summary", "is", null)
     : { data: [] };
 
   const enrichmentCache: EnrichmentCache = new Map(
-    (cachedRows ?? []).map((a) => [a.external_id, { combined: a.ai_summary }])
+    (cachedRows ?? []).map((a) => [a.external_id, { aiSummary: a.ai_summary, impactAnalysis: a.impact_analysis }])
   );
 
   const scored = scoreArticles(rawArticles, preferences, feedbackMap, algorithmSettings, clickedUrls);
@@ -286,10 +286,10 @@ export async function buildArticleQueue(
     if (!queueId) return;
 
     const cached = enrichmentCache.get(extId);
-    if (cached?.combined) {
+    if (cached?.aiSummary) {
       await supabase
         .from("article_queue")
-        .update({ ai_summary: cached.combined })
+        .update({ ai_summary: cached.aiSummary, impact_analysis: cached.impactAnalysis ?? null })
         .eq("id", queueId);
       return;
     }
@@ -305,7 +305,7 @@ export async function buildArticleQueue(
       publishedAt: article.published_at ?? new Date().toISOString(),
     };
 
-    const { combined, impactLevel } = await analyseArticle(
+    const { summary, impactAnalysis, impactLevel } = await analyseArticle(
       raw,
       preferences.profile,
       geminiProfile,
@@ -317,14 +317,15 @@ export async function buildArticleQueue(
     await supabase
       .from("article_queue")
       .update({
-        ai_summary:   combined,
-        impact_level: impactLevel,
+        ai_summary:      summary,
+        impact_analysis: impactAnalysis,
+        impact_level:    impactLevel,
       })
       .eq("id", queueId);
 
     await supabase
       .from("articles")
-      .update({ ai_summary: combined })
+      .update({ ai_summary: summary, impact_analysis: impactAnalysis })
       .eq("external_id", extId);
   }
 

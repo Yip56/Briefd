@@ -35,7 +35,8 @@ function articleRow(a: ScoredArticle, index: number): string {
       <a href="${a.article_url}" style="font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:700;color:#111827;text-decoration:none;line-height:1.35">${a.title}</a>
     </td></tr>
     <tr><td style="padding-bottom:10px;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#374151;line-height:1.65">
-      ${a.combined || a.summary || ""}${a.impactLevel === "high" ? " ⚡" : ""}
+      ${a.aiSummary || a.summary || ""}
+      ${a.impactAnalysis ? `<div style="margin-top:8px;padding:8px 12px;background:#FDF8ED;border-left:2px solid #F0A500;border-radius:4px"><div style="font-family:monospace;font-size:10px;color:#C9972A;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">⚡ Impacts you</div><div style="font-family:Georgia,serif;font-size:13px;font-style:italic;color:#5C4A00;line-height:1.6">${a.impactAnalysis}</div></div>` : ""}
     </td></tr>
     <tr><td>
       <div style="display:flex;align-items:center;justify-content:space-between">

@@ -57,7 +57,8 @@ function rowToScoredArticle(row: QueueRow, feedbackMap: Record<string, VoteValue
     is_video:       art.is_video ?? false,
     relevanceScore: row.relevance_score,
     impactLevel:    (row.impact_level ?? "medium") as ImpactLevel,
-    combined:       row.ai_summary ?? art.ai_summary ?? art.summary ?? "",
+    aiSummary:      row.ai_summary ?? art.ai_summary ?? art.summary ?? "",
+    impactAnalysis: row.impact_analysis ?? art.impact_analysis ?? "",
     userVote:       feedbackMap[extId] ?? null,
   } satisfies ScoredArticle;
 }

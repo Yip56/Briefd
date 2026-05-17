@@ -20,10 +20,11 @@ export async function analyseArticle(
   userId?: string,
   sessionId?: string,
   supabase?: SupabaseClient
-): Promise<{ combined: string; impactLevel: ImpactLevel }> {
+): Promise<{ summary: string; impactAnalysis: string; impactLevel: ImpactLevel }> {
   const fallback = {
-    combined:    article.summary.slice(0, 150),
-    impactLevel: "medium" as ImpactLevel,
+    summary:        article.summary.slice(0, 150),
+    impactAnalysis: "",
+    impactLevel:    "medium" as ImpactLevel,
   };
 
   if (!process.env.GROQ_API_KEY) return fallback;

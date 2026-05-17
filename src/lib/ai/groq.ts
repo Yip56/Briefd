@@ -39,10 +39,11 @@ export async function analyseArticleGroq(
   userProfile: Profile,
   aiProfile: string,
   tracking?: AiTracking
-): Promise<{ combined: string; impactLevel: ImpactLevel }> {
+): Promise<{ summary: string; impactAnalysis: string; impactLevel: ImpactLevel }> {
   const fallback = {
-    combined:    article.summary.slice(0, 150),
-    impactLevel: "medium" as ImpactLevel,
+    summary:        article.summary.slice(0, 150),
+    impactAnalysis: "",
+    impactLevel:    "medium" as ImpactLevel,
   };
 
   if (!process.env.GROQ_API_KEY) return fallback;
@@ -65,7 +66,7 @@ export async function analyseArticleGroq(
     `Article: ${article.title}\n` +
     `Content: ${article.summary.slice(0, 400)}\n\n` +
     `Respond with JSON only, no markdown, no code fences:\n` +
-    `{"combined":"Complete sentence combining what happened AND how it affects you AND when. Format: [What happened] — [direct impact on you] [specific date/timeframe if available]. Max 45 words. Must be a complete sentence.","impactLevel":"high or medium or low"}`;
+    `{"summary":"One clear sentence max 25 words — what happened, the key fact only. No impact here.","impactAnalysis":"1-2 sentences starting with You or Your — direct personal impact with specific figures, dates, amounts. Only mention profile details if directly relevant.","impactLevel":"high or medium or low"}`;
 
   try {
     const text  = await callGroq(userPrompt, systemPrompt, 400);
@@ -80,8 +81,9 @@ export async function analyseArticleGroq(
     }
 
     return {
-      combined:    parsed.combined ?? fallback.combined,
-      impactLevel: level,
+      summary:        parsed.summary ?? fallback.summary,
+      impactAnalysis: parsed.impactAnalysis ?? "",
+      impactLevel:    level,
     };
   } catch {
     return fallback;

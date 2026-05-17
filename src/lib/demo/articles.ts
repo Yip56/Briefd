@@ -13,6 +13,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
     impactScore: 80,
     profileTags: ["working adult", "Renting", "Looking to buy property"],
+    demoSummary: "Bank Negara held the OPR at 3.00% for the fifth consecutive meeting, keeping borrowing costs stable.",
+    demoImpact: "Your mortgage repayments stay unchanged — on a RM500,000 variable-rate loan, monthly payments remain at roughly RM2,200 for now.",
   },
   {
     externalId: "demo_eco_002",
@@ -25,6 +27,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 5 * 3600_000).toISOString(),
     impactScore: 60,
     profileTags: ["Business Owner", "Investor"],
+    demoSummary: "Malaysia's economy grew 4.8% in Q1 2025, beating forecasts on strong exports and domestic consumption.",
+    demoImpact: "Stronger economic growth signals a healthier job market — your employment prospects and salary negotiation leverage may improve in the months ahead.",
   },
   {
     externalId: "demo_eco_003",
@@ -37,6 +41,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 4 * 3600_000).toISOString(),
     impactScore: 55,
     profileTags: ["Business Owner", "Investor", "working adult"],
+    demoSummary: "The ringgit strengthened to 4.42 against the US dollar, its best level in two months.",
+    demoImpact: "Your imported goods and overseas purchases are cheaper — a USD100 item now costs roughly RM442 instead of RM460 from two months ago.",
   },
   {
     externalId: "demo_eco_004",
@@ -49,6 +55,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 10 * 3600_000).toISOString(),
     impactScore: 95,
     profileTags: ["working adult", "Fresh Graduate", "Student"],
+    demoSummary: "EPF declared a 6.10% dividend for conventional savings in 2024 — the highest payout in five years, totalling RM57.7 billion.",
+    demoImpact: "Your EPF savings earn 6.10% this year — on a RM100,000 balance, that's RM6,100 credited directly to your account.",
   },
 
   // Finance & Investing
@@ -63,6 +71,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 6 * 3600_000).toISOString(),
     impactScore: 60,
     profileTags: ["Investor", "Business Owner"],
+    demoSummary: "Bursa's KLCI rose 12.4 points to close at 1,581 as foreign investors turned net buyers for a third session.",
+    demoImpact: "If you hold Malaysian equities or unit trusts, your portfolio value edged higher today — banking and technology funds posted the strongest gains.",
   },
   {
     externalId: "demo_fin_002",
@@ -75,6 +85,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 8 * 3600_000).toISOString(),
     impactScore: 90,
     profileTags: ["Investor", "Business Owner", "working adult"],
+    demoSummary: "The government shelved its proposed capital gains tax on Bursa-listed shares following strong investor pushback, effective immediately.",
+    demoImpact: "You can sell shares on Bursa Malaysia without any capital gains tax — all profits from stock sales remain fully tax-free with immediate effect.",
   },
 
   // Malaysian Politics
@@ -89,6 +101,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 12 * 3600_000).toISOString(),
     impactScore: 65,
     profileTags: ["Student", "Fresh Graduate"],
+    demoSummary: "Parliament approved amendments allowing 18-year-olds to stand as election candidates, not just vote, before the next state elections.",
+    demoImpact: "If you're between 18 and 21, you are now legally eligible to contest elections — a significant expansion of your civic rights.",
   },
   {
     externalId: "demo_pol_002",
@@ -101,6 +115,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 18 * 3600_000).toISOString(),
     impactScore: 50,
     profileTags: ["working adult"],
+    demoSummary: "Sarawak's state election is confirmed for 23 August 2025, with nomination day on 9 August across 82 seats.",
+    demoImpact: "If you're a registered Sarawak voter, mark 23 August 2025 on your calendar — check your polling details at SPR.gov.my now.",
   },
 
   // Tech & AI
@@ -115,6 +131,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 3 * 3600_000).toISOString(),
     impactScore: 70,
     profileTags: ["Business Owner", "Investor", "working adult"],
+    demoSummary: "Malaysia launched a RM2.5 billion National AI Fund to subsidise data centre electricity costs, with Google, Microsoft and Nvidia as first beneficiaries.",
+    demoImpact: "Your job market in tech is set to expand — these hyperscale investments typically create thousands of local tech and operations roles over the next 2–3 years.",
   },
   {
     externalId: "demo_tech_002",
@@ -127,6 +145,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 7 * 3600_000).toISOString(),
     impactScore: 55,
     profileTags: ["working adult", "Student"],
+    demoSummary: "MCMC will require platforms to label AI-generated content and remove deepfakes within 24 hours, with fines up to RM500,000.",
+    demoImpact: "You'll see AI-labelled content more clearly on social media — if you create online content, ensure any AI-generated material is properly disclosed to avoid penalties.",
   },
   {
     externalId: "demo_tech_003",
@@ -139,6 +159,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 9 * 3600_000).toISOString(),
     impactScore: 50,
     profileTags: ["working adult", "commuter"],
+    demoSummary: "Grab Malaysia will auto-suspend drivers scoring below 60 on its new AI safety system for two consecutive trips, starting 1 June 2025.",
+    demoImpact: "Your Grab booking may be cancelled more often by the safety system — if a driver is suspended mid-trip, request a new driver immediately.",
   },
 
   // Property
@@ -153,6 +175,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 14 * 3600_000).toISOString(),
     impactScore: 85,
     profileTags: ["Looking to buy property", "Renting", "working adult"],
+    demoSummary: "Median terraced house prices in the Klang Valley hit RM620,000 in Q1 2025, up 8% from a year ago.",
+    demoImpact: "Your target property is now roughly RM50,000 more expensive than a year ago — delaying your purchase further will likely cost you more as prices continue rising.",
   },
   {
     externalId: "demo_prop_002",
@@ -165,6 +189,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 22 * 3600_000).toISOString(),
     impactScore: 90,
     profileTags: ["Looking to buy property", "Fresh Graduate", "working adult"],
+    demoSummary: "The My First Home Scheme raised its loan ceiling to RM500,000 for households earning up to RM10,000/month, opening 1 June 2025.",
+    demoImpact: "If your household income is under RM10,000/month, you can now borrow RM150,000 more than before — applications open 1 June 2025.",
   },
   {
     externalId: "demo_prop_003",
@@ -177,6 +203,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 30 * 3600_000).toISOString(),
     impactScore: 75,
     profileTags: ["Looking to buy property", "Renting"],
+    demoSummary: "Penang approved 3,000 affordable housing units in Batu Kawan from RM250,000, with a priority ballot for local residents opening in July.",
+    demoImpact: "If you're a Penang resident, register for the priority ballot in July — units start at RM250,000 for a 900 sq ft home in Batu Kawan.",
   },
 
   // Fuel & Transport
@@ -191,6 +219,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 1 * 3600_000).toISOString(),
     impactScore: 98,
     profileTags: ["Car owner", "Both", "working adult", "commuter"],
+    demoSummary: "RON95 petrol price rises from RM2.05 to RM2.45 per litre from 1 July 2025 as subsidy rationalisation begins.",
+    demoImpact: "If you fill a 40-litre tank weekly, your monthly fuel bill rises by RM64 — eligible B40 households receive RM100/month via e-Kasih to offset this.",
   },
   {
     externalId: "demo_fuel_002",
@@ -203,6 +233,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 2.5 * 3600_000).toISOString(),
     impactScore: 85,
     profileTags: ["commuter", "working adult", "Shah Alam"],
+    demoSummary: "The LRT3 opened with 26 stations from Bandar Utama to Johan Setia across 37km, with free rides for all until 30 June 2025.",
+    demoImpact: "If your commute passes through Shah Alam or Klang, you can ride the full LRT3 line for free until 30 June 2025 — saving on petrol and toll costs.",
   },
   {
     externalId: "demo_fuel_003",
@@ -215,6 +247,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 5 * 3600_000).toISOString(),
     impactScore: 70,
     profileTags: ["Car owner", "Both", "commuter"],
+    demoSummary: "Tolls on NPE, SPRINT, DUKE and five other urban expressways are waived from 5–7 June 2025 for Hari Raya Haji.",
+    demoImpact: "You save on toll charges on these urban expressways from 5–7 June 2025 — note that the North-South Expressway and intercity highways are not included.",
   },
   {
     externalId: "demo_fuel_004",
@@ -227,6 +261,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     publishedAt: new Date(Date.now() - 16 * 3600_000).toISOString(),
     impactScore: 75,
     profileTags: ["Car owner", "Both", "commuter", "working adult"],
+    demoSummary: "JPJ now allows instant driving licence renewal via the MyJPJ app in under 5 minutes, covering Class B2, D and DA licences.",
+    demoImpact: "You can renew your driving licence from your phone without queuing — complete payment in MyJPJ and receive your digital licence within 5 minutes.",
   },
   {
     externalId: "demo_021",
@@ -240,6 +276,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 78,
     profileTags: ["Investor", "Business Owner"],
+    demoSummary: "Bursa's KLCI hit 1,640 points — the highest since 2018 — on RM2.1 billion in net foreign inflows in March 2025.",
+    demoImpact: "Your Malaysian equity holdings are at their most valuable in seven years — Kenanga and Maybank IB both raised their year-end targets to 1,700.",
   },
   {
     externalId: "demo_022",
@@ -253,6 +291,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 75,
     profileTags: ["Business Owner", "Self-Employed / Freelance"],
+    demoSummary: "Cradle Fund opened CIP500 grant applications offering up to RM500,000 in non-dilutive funding, closing 30 April 2025.",
+    demoImpact: "If you're building a startup in agritech, healthtech, fintech or climate tech, apply via cradle.com.my before 30 April 2025 for up to RM500,000 in free funding.",
   },
   {
     externalId: "demo_023",
@@ -266,6 +306,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 70,
     profileTags: ["Investor", "Business Owner"],
+    demoSummary: "The US Fed signalled one 25bp rate cut in Q4 2025, with economists forecasting the ringgit to strengthen to 4.20–4.25 by year-end.",
+    demoImpact: "Your ringgit savings and USD-priced purchases may improve — a ringgit at 4.20 means you'd spend roughly RM200 less to buy USD1,000 compared to current rates.",
   },
   {
     externalId: "demo_024",
@@ -279,6 +321,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 76,
     profileTags: ["Car owner", "Both"],
+    demoSummary: "Proton's e.MAS 7 crossed 3,000 units sold and the government extended EV import duty exemptions until end of 2026.",
+    demoImpact: "You have until end of 2026 to buy an EV at duty-exempted prices — BYD, Chery and Tesla models remain competitively priced while the exemption holds.",
   },
   {
     externalId: "demo_025",
@@ -292,6 +336,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 72,
     profileTags: ["Business Owner", "Investor"],
+    demoSummary: "AMLA amendments raised corporate penalties to RM10 million per offence; businesses above RM5M revenue must appoint a compliance officer by January 2026.",
+    demoImpact: "If your business earns over RM5 million annually, you must appoint a dedicated compliance officer by January 2026 or risk penalties up to RM10 million per offence.",
   },
   {
     externalId: "demo_026",
@@ -305,6 +351,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 80,
     profileTags: ["Employed (Private)", "Employed (Government)", "Business Owner", "Fresh Graduate"],
+    demoSummary: "HRDF released 847 approved AI and digital upskilling courses claimable up to RM5,000 per employee per year.",
+    demoImpact: "Your employer can claim up to RM5,000 for you to enrol in AI courses like Python for Data Science or Prompt Engineering — ask your HR department to apply.",
   },
   {
     externalId: "demo_027",
@@ -318,6 +366,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 79,
     profileTags: ["Homemaker"],
+    demoSummary: "Malaysia extended free HPV vaccination to all boys under 18 at Klinik Kesihatan, with school registration via MyHealth portal from April 2025.",
+    demoImpact: "If you have a son under 18, register him for the free three-dose HPV vaccine via the MyHealth portal — this programme costs RM900 privately.",
   },
   {
     externalId: "demo_028",
@@ -331,6 +381,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 77,
     profileTags: ["Investor", "Business Owner", "Johor"],
+    demoSummary: "The Johor-Singapore SEZ secured RM15 billion in investments targeting 20,000 jobs by 2027, with a flat 15% corporate tax rate.",
+    demoImpact: "If you're considering expanding a business, JS-SEZ offers a flat 15% corporate tax and 10-year tax holiday — 20,000 direct jobs are targeted by 2027.",
   },
   {
     externalId: "demo_029",
@@ -344,6 +396,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 74,
     profileTags: [],
+    demoSummary: "Malaysia's 5G coverage reached 80% of populated areas in Q1 2025; consumer 5G plan prices are expected to drop 15–25% by Q3 2025.",
+    demoImpact: "Your 5G mobile plan is likely to get 15–25% cheaper by Q3 2025 as Maxis, Celcom, Digi, and U Mobile compete on the shared DNB network.",
   },
   {
     externalId: "demo_030",
@@ -357,6 +411,8 @@ export const DEMO_ARTICLES: RawArticle[] = [
     isVideo: false,
     impactScore: 82,
     profileTags: ["Investor"],
+    demoSummary: "ASB declared a total payout of 5.0 sen per unit for 2024 — 4.75 sen income plus 0.25 sen bonus — the highest since 2019.",
+    demoImpact: "Your ASB account earns 5.0 sen per unit this year — on the maximum 300,000 units, that's RM15,000 credited to your account by 31 March 2025.",
   },
 ];
 

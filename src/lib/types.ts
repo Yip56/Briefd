@@ -83,6 +83,8 @@ export interface RawArticle {
   isVideo?: boolean
   impactScore?: number
   profileTags?: string[]
+  demoSummary?: string
+  demoImpact?: string
 }
 
 export interface RssFeed {
@@ -96,7 +98,8 @@ export interface RssFeed {
 export interface ScoredArticle extends Article {
   relevanceScore: number
   impactLevel: ImpactLevel
-  combined: string
+  aiSummary: string
+  impactAnalysis: string
   userVote?: VoteValue | null
 }
 
