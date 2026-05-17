@@ -28,7 +28,7 @@ function ArticleRow({ article }: { article: ScoredArticle }) {
         {article.title}
       </a>
       <p className="text-[13px] text-gray-500 leading-relaxed line-clamp-2 mb-2">
-        {(article as ScoredArticle & { aiSummary?: string }).aiSummary || article.summary}
+        {article.combined || article.summary}
       </p>
       <div className="flex items-center gap-3 text-xs text-gray-300">
         {article.source_name && <span>{article.source_name}</span>}

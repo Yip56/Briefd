@@ -76,7 +76,9 @@ export const RSS_FEEDS = [
   { name: 'EdgeProp', url: 'https://www.edgeprop.my/rss.xml', topic: 'Property' },
 ] as const
 
-export const IS_DEMO_MODE = process.env.NEXT_PUBLIC_DATA_MODE === 'demo'
+export const IS_DEMO_MODE =
+  process.env.NEXT_PUBLIC_DATA_MODE === 'demo' ||
+  process.env.DATA_MODE === 'demo'
 
 // Sentinel value used in impactAnalysis to indicate quota was exceeded
 export const GEMINI_QUOTA_EXCEEDED = "__GEMINI_QUOTA_EXCEEDED__"

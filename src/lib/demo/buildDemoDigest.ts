@@ -24,7 +24,7 @@ export function buildDemoDigest(
   const withText = (articles: ScoredArticle[]): ScoredArticle[] =>
     articles.map((a) => ({
       ...a,
-      combined: a.combined || buildDemoSentence(a.summary || a.title),
+      combined: buildDemoSentence(a.summary || a.title),
     }));
 
   return {

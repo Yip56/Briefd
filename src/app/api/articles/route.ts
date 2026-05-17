@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
         ...a,
         relevanceScore: row.relevance_score,
         impactLevel:    row.impact_level as ScoredArticle["impactLevel"],
-        aiSummary:      row.ai_summary ?? "",
+        combined:       row.ai_summary ?? "",
         userVote:       voteMap.get(a.id) ?? null,
       };
     });

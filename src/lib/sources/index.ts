@@ -117,7 +117,10 @@ export async function fetchAllSources(topics: string[]): Promise<RawArticle[]> {
   );
 
   const combined = [...newsApi, ...rss, ...reddit, ...googleNews, ...youtube];
-  const source   = combined.length > 0 ? combined : [...FALLBACK_ARTICLES];
+  const fallback = topics.length > 0
+    ? FALLBACK_ARTICLES.filter((a) => topics.includes(a.topic))
+    : [...FALLBACK_ARTICLES];
+  const source   = combined.length > 0 ? combined : fallback;
 
   const seen = new Set<string>();
   const deduped = source.filter((a) => {

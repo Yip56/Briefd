@@ -4,8 +4,9 @@ import {
   analyseArticleGroq,
   groqSummariseArticle,
   groqGetImpactAnalysis,
+  type AiTracking,
 } from "./groq";
-import { canMakeCall, recordGeminiCall } from "./budget";
+import { canMakeCall } from "./budget";
 import { GEMINI_QUOTA_EXCEEDED as _QUOTA_CONST } from "@/lib/constants";
 
 // Re-export from constants so server-only callers can still import from here
@@ -19,20 +20,13 @@ export async function analyseArticle(
   userId?: string,
   sessionId?: string,
   supabase?: SupabaseClient
-): Promise<{ summary: string; impactAnalysis: string; impactLevel: ImpactLevel }> {
+): Promise<{ combined: string; impactLevel: ImpactLevel }> {
   const fallback = {
-    summary:        article.summary.slice(0, 150),
-    impactAnalysis: "Impact analysis unavailable — daily AI limit reached. Refresh tomorrow for full analysis.",
-    impactLevel:    "medium" as ImpactLevel,
+    combined:    article.summary.slice(0, 150),
+    impactLevel: "medium" as ImpactLevel,
   };
 
-  if (!process.env.GROQ_API_KEY) {
-    return {
-      summary:        article.summary.slice(0, 150),
-      impactAnalysis: "Impact analysis unavailable for this article.",
-      impactLevel:    "medium",
-    };
-  }
+  if (!process.env.GROQ_API_KEY) return fallback;
 
   if (userId && sessionId && supabase) {
     const allowed = await canMakeCall(userId, sessionId, supabase);
@@ -43,11 +37,9 @@ export async function analyseArticle(
   }
 
   try {
-    const result = await analyseArticleGroq(article, userProfile, aiProfile);
-    if (userId && sessionId && supabase) {
-      await recordGeminiCall(userId, "article_analysis", sessionId, supabase);
-    }
-    return result;
+    const tracking: AiTracking | undefined =
+      userId && sessionId && supabase ? { userId, sessionId, supabase } : undefined;
+    return await analyseArticleGroq(article, userProfile, aiProfile, tracking);
   } catch (err) {
     console.error("[AI] analyseArticleGroq failed:", err);
     return fallback;

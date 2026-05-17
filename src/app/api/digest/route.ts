@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildArticleQueue } from "@/lib/queue/buildQueue";
 import { geminiQuotaRetryAfter } from "@/lib/ai/summarise";
+import { getDailyBudget } from "@/lib/ai/budget";
 import { IS_DEMO_MODE } from "@/lib/constants";
+import { buildDemoDigest } from "@/lib/demo/buildDemoDigest";
+import { DEMO_ARTICLES } from "@/lib/demo/articles";
 import type { ImpactLevel, ScoredArticle, VoteValue, QueueStats, DigestResult } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -54,8 +57,7 @@ function rowToScoredArticle(row: QueueRow, feedbackMap: Record<string, VoteValue
     is_video:       art.is_video ?? false,
     relevanceScore: row.relevance_score,
     impactLevel:    (row.impact_level ?? "medium") as ImpactLevel,
-    aiSummary:      row.ai_summary ?? art.ai_summary ?? art.summary ?? "",
-    impactAnalysis: (row.impact_analysis ?? art.impact_analysis) ?? undefined,
+    combined:       row.ai_summary ?? art.ai_summary ?? art.summary ?? "",
     userVote:       feedbackMap[extId] ?? null,
   } satisfies ScoredArticle;
 }
@@ -85,9 +87,13 @@ async function buildDigestResponse(
   supabase: SupabaseInstance,
   isDemo = false
 ): Promise<DigestResult> {
-  const batch    = await fetchUnservedBatch(userId, supabase, BATCH_SIZE);
+  const [batch, { totalQueued, totalServed }, budget] = await Promise.all([
+    fetchUnservedBatch(userId, supabase, BATCH_SIZE),
+    getQueueCounts(userId, supabase),
+    getDailyBudget(userId, supabase),
+  ]);
+
   const articles = batch.map((row) => rowToScoredArticle(row, feedbackMap)).filter(Boolean) as ScoredArticle[];
-  const { totalQueued, totalServed } = await getQueueCounts(userId, supabase);
 
   const queueStats: QueueStats = {
     totalQueued,
@@ -105,6 +111,7 @@ async function buildDigestResponse(
     geminiQuotaRetryAfter,
     queueStats,
     isDemo,
+    aiBudgetExhausted:     budget.groq.remaining === 0,
   };
 }
 
@@ -117,7 +124,10 @@ export async function GET(request: NextRequest) {
   // Determine demo/live mode: cookie overrides global env
   const cookieMode = request.cookies.get("briefd_data_mode")?.value;
   const isDemo     = cookieMode === "live" ? false : cookieMode === "demo" ? true : IS_DEMO_MODE;
-  console.log(`[Briefd] Data mode: ${isDemo ? "demo" : "live"}`);
+  console.log("[Digest] NEXT_PUBLIC_DATA_MODE:", process.env.NEXT_PUBLIC_DATA_MODE);
+  console.log("[Digest] DATA_MODE:", process.env.DATA_MODE);
+  console.log("[Digest] IS_DEMO_MODE:", IS_DEMO_MODE);
+  console.log("[Digest] isDemo (after cookie):", isDemo);
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -151,7 +161,18 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const selectedTopics = topics.filter((t) => t.is_preset).map((t) => t.topic);
+  console.log("[Digest] Selected topics:", selectedTopics.join(", ") || "(none)");
+
   const preferences = { profile, topics };
+
+  // ── Demo mode hard guard — bypass DB queue entirely ───────────────────────
+  if (isDemo) {
+    console.log("[Demo] Available topics:", [...new Set(DEMO_ARTICLES.map((a) => a.topic))]);
+    console.log("[Demo] Filtering for:", selectedTopics);
+    const result = buildDemoDigest(selectedTopics, preferences, algorithmSettings);
+    return NextResponse.json(result);
+  }
 
   // ── Force-fresh ───────────────────────────────────────────────────────────
   if (isRefreshNew) {

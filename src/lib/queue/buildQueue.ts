@@ -118,17 +118,29 @@ export async function buildArticleQueue(
   const topicNames    = preferences.topics.map((t) => t.topic);
   const composition   = algorithmSettings?.topic_composition ?? {};
   const geminiProfile = algorithmSettings?.gemini_profile ?? "";
-  const sessionId     = crypto.randomUUID();
+  const sessionId     = `digest_${Date.now()}`;
 
   let rawArticles;
   if (isDemoMode) {
-    rawArticles = DEMO_ARTICLES;
+    rawArticles = topicNames.length > 0
+      ? DEMO_ARTICLES.filter((a) => topicNames.includes(a.topic))
+      : DEMO_ARTICLES;
     console.log("[Briefd] Data mode: demo");
   } else {
     rawArticles = await fetchAllSources(topicNames);
     console.log("[Briefd] Data mode: live");
   }
   console.log(`[Queue] sources → ${rawArticles.length} raw articles`);
+
+  // Hard topic filter — safety net before scoring
+  const filtered = topicNames.length > 0
+    ? rawArticles.filter((a) => topicNames.includes(a.topic))
+    : rawArticles;
+  if (filtered.length === 0 && rawArticles.length > 0) {
+    console.warn("[Queue] All articles filtered out — none match selected topics:", topicNames);
+    return;
+  }
+  rawArticles = filtered;
 
   // Deduplicate by external_id — PostgreSQL refuses to update the same row twice in one upsert batch
   const seenExtIds = new Set<string>();
@@ -171,13 +183,13 @@ export async function buildArticleQueue(
   const { data: cachedRows } = externalIds.length > 0
     ? await supabase
         .from("articles")
-        .select("external_id, ai_summary, impact_analysis")
+        .select("external_id, ai_summary")
         .in("external_id", externalIds)
         .not("ai_summary", "is", null)
     : { data: [] };
 
   const enrichmentCache: EnrichmentCache = new Map(
-    (cachedRows ?? []).map((a) => [a.external_id, { aiSummary: a.ai_summary, impactAnalysis: a.impact_analysis }])
+    (cachedRows ?? []).map((a) => [a.external_id, { combined: a.ai_summary }])
   );
 
   const scored = scoreArticles(rawArticles, preferences, feedbackMap, algorithmSettings, clickedUrls);
@@ -274,10 +286,10 @@ export async function buildArticleQueue(
     if (!queueId) return;
 
     const cached = enrichmentCache.get(extId);
-    if (cached?.aiSummary && cached?.impactAnalysis) {
+    if (cached?.combined) {
       await supabase
         .from("article_queue")
-        .update({ ai_summary: cached.aiSummary, impact_analysis: cached.impactAnalysis })
+        .update({ ai_summary: cached.combined })
         .eq("id", queueId);
       return;
     }
@@ -293,8 +305,7 @@ export async function buildArticleQueue(
       publishedAt: article.published_at ?? new Date().toISOString(),
     };
 
-    // Single combined Gemini call per article
-    const { summary, impactAnalysis, impactLevel } = await analyseArticle(
+    const { combined, impactLevel } = await analyseArticle(
       raw,
       preferences.profile,
       geminiProfile,
@@ -306,15 +317,14 @@ export async function buildArticleQueue(
     await supabase
       .from("article_queue")
       .update({
-        ai_summary:      summary,
-        impact_analysis: article.impactLevel === "low" ? null : impactAnalysis,
-        impact_level:    impactLevel,
+        ai_summary:   combined,
+        impact_level: impactLevel,
       })
       .eq("id", queueId);
 
     await supabase
       .from("articles")
-      .update({ ai_summary: summary, impact_analysis: impactAnalysis })
+      .update({ ai_summary: combined })
       .eq("external_id", extId);
   }
 
@@ -348,4 +358,5 @@ export async function buildArticleQueue(
   console.log(
     `[Queue] Built: ${queued.length} articles, positions ${startPosition}–${startPosition + queued.length - 1}`
   );
+  console.log(`[AI tracking] Session ${sessionId} — ${queued.length} articles queued for analysis`);
 }

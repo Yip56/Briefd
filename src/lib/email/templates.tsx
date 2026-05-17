@@ -35,19 +35,8 @@ function articleRow(a: ScoredArticle, index: number): string {
       <a href="${a.article_url}" style="font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:700;color:#111827;text-decoration:none;line-height:1.35">${a.title}</a>
     </td></tr>
     <tr><td style="padding-bottom:10px;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#374151;line-height:1.65">
-      ${a.aiSummary || a.summary || ""}
+      ${a.combined || a.summary || ""}${a.impactLevel === "high" ? " ⚡" : ""}
     </td></tr>
-    ${a.impactAnalysis && a.impactLevel !== "low" ? `
-    <tr><td style="padding-bottom:12px">
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="width:3px;background:#F0A500;border-radius:2px"></td>
-          <td style="padding:8px 12px;font-family:Georgia,'Times New Roman',serif;font-size:13px;font-style:italic;color:#5C4A00;line-height:1.6">
-            ⚡ Impacts you: ${a.impactAnalysis}
-          </td>
-        </tr>
-      </table>
-    </td></tr>` : ""}
     <tr><td>
       <div style="display:flex;align-items:center;justify-content:space-between">
         ${sourceLbl ? `<span style="font-family:monospace;font-size:10px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.08em">${sourceLbl}${pubDate ? ` · ${pubDate}` : ""}</span>` : ""}

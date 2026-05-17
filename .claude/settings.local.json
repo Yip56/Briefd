@@ -17,7 +17,20 @@
       "PowerShell(head *)",
       "PowerShell(dashboard *)",
       "Bash(Test-Path *)",
-      "Bash(curl -s http://localhost:3000/api/digest)"
+      "Bash(curl -s http://localhost:3000/api/digest)",
+      "Bash(dir C:\\\\Users\\\\YLX\\\\briefd\\\\supabase *)",
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\YLX\\\\briefd\\\\src\\\\app\\\\api\\\\email\\\\test\")",
+      "Bash(Out-Null)",
+      "PowerShell(New-Item *)",
+      "Bash(Select-String -Path \"C:\\\\Users\\\\YLX\\\\briefd\\\\src\\\\lib\\\\demo\\\\articles.ts\" -Pattern \"externalId:\")",
+      "Bash(Measure-Object)",
+      "Bash(Select-Object -ExpandProperty Count)",
+      "PowerShell(Select-String *)",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\YLX\\\\briefd\\\\src\\\\lib\\\\demo\\\\articles.ts\" -Pattern \"externalId:\" | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\YLX\\\\briefd\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(vercel *)",
+      "PowerShell(vercel *)"
     ]
   }
 }

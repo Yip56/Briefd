@@ -108,9 +108,8 @@ export async function GET(request: NextRequest) {
             is_video:       a.is_video ?? false,
             relevanceScore: r.relevance_score,
             impactLevel:    (r.impact_level ?? "medium") as ImpactLevel,
-            aiSummary:      r.ai_summary ?? a.summary ?? "",
-            impactAnalysis: r.impact_analysis ?? undefined,
-            userVote:       null,
+            combined:  r.ai_summary ?? a.summary ?? "",
+            userVote:  null,
           };
         });
 

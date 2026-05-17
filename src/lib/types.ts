@@ -81,6 +81,8 @@ export interface RawArticle {
   topic: string
   publishedAt: string
   isVideo?: boolean
+  impactScore?: number
+  profileTags?: string[]
 }
 
 export interface RssFeed {
@@ -94,8 +96,7 @@ export interface RssFeed {
 export interface ScoredArticle extends Article {
   relevanceScore: number
   impactLevel: ImpactLevel
-  aiSummary: string
-  impactAnalysis?: string
+  combined: string
   userVote?: VoteValue | null
 }
 
@@ -115,11 +116,13 @@ export interface QueueStats {
 
 export interface DigestResult {
   articles: ScoredArticle[]
+  remainingArticles?: ScoredArticle[]
   generatedAt: string
   totalScored: number
   geminiQuotaRetryAfter?: string | null
   queueStats?: QueueStats
   isDemo?: boolean
+  aiBudgetExhausted?: boolean
 }
 
 export interface UserAlgorithmSettings {

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { callGroq, groqExtractAvoidanceKeywords, groqUpdateProfile } from "./groq";
-import { canMakeCall, recordGeminiCall } from "./budget";
+import { canMakeCall, recordAiCall } from "./budget";
 
 export async function extractAvoidanceKeywords(
   title: string,
@@ -23,7 +23,7 @@ export async function extractAvoidanceKeywords(
   try {
     const keywords = await groqExtractAvoidanceKeywords(title, reason, freeText, topic);
     if (keywords.length > 0 && userId && supabase) {
-      await recordGeminiCall(userId, "feedback_keywords", sessionId, supabase).catch(() => {});
+      await recordAiCall(userId, "feedback_keywords", sessionId, "groq", supabase).catch(() => {});
     }
     console.log("[AI] Avoidance keywords via Groq");
     return keywords;
@@ -69,7 +69,7 @@ export async function updateGeminiProfile(
     if (!aiProfile) return;
 
     console.log("[AI] User profile via Groq");
-    await recordGeminiCall(userId, "profile_update", sessionId, supabase).catch(() => {});
+    await recordAiCall(userId, "profile_update", sessionId, "groq", supabase).catch(() => {});
     await supabase
       .from("user_algorithm_settings")
       .upsert(

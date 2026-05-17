@@ -14,23 +14,40 @@ import {
 } from "@/lib/constants";
 import type { Profile } from "@/lib/types";
 
+interface ProviderUsage {
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
+interface DailyBudget {
+  groq: ProviderUsage;
+  gemini: ProviderUsage;
+  total: ProviderUsage;
+  resetAt: string;
+  todayDate: string;
+}
+
 interface UsageBreakdownRow {
   call_type: string;
+  provider: string;
   count: number;
   tokens_est: number;
 }
 
-interface DailyBudget {
-  callsUsed: number;
-  callsLimit: number;
-  remaining: number;
-  resetAt: string;
+interface WeekHistoryRow {
+  date: string;
+  total_calls: number;
+  groq_calls: number;
+  gemini_calls: number;
 }
 
 interface UsageData {
   dailyBudget: DailyBudget;
   todayBreakdown: UsageBreakdownRow[];
-  weekHistory: Array<{ date: string; calls_used: number; articles_analysed: number; feedback_calls: number }>;
+  weekHistory: WeekHistoryRow[];
+  geminiConfigured: boolean;
+  groqConfigured: boolean;
 }
 
 function Select({ label, value, onChange, options }: {
@@ -79,123 +96,206 @@ function topicWeight(index: number): number {
 
 // ─── AI Usage Section ────────────────────────────────────────────────────────
 
-function AIUsageSection({ usage }: { usage: UsageData | null }) {
-  const [showHistory, setShowHistory] = useState(false);
+function ProviderBar({ pct }: { pct: number }) {
+  const color = pct >= 95 ? "#DC2626" : pct >= 80 ? "#D97706" : "#1D5C3A";
+  return (
+    <div className="w-full h-1.5 rounded-full bg-gray-100 overflow-hidden">
+      <div style={{ width: `${Math.min(100, pct)}%`, background: color, transition: "width 0.3s" }} className="h-full rounded-full" />
+    </div>
+  );
+}
 
-  if (!usage) {
+function AIUsageSection() {
+  const [usage,        setUsage]        = useState<UsageData | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(true);
+  const [showHistory,  setShowHistory]  = useState(false);
+
+  async function fetchUsage() {
+    setLoadingUsage(true);
+    try {
+      const res = await fetch("/api/usage");
+      const d   = await res.json();
+      if (d.dailyBudget) setUsage(d);
+    } catch { /* noop */ } finally {
+      setLoadingUsage(false);
+    }
+  }
+
+  useEffect(() => { fetchUsage(); }, []);
+
+  const headerRow = (
+    <div className="flex items-center justify-between mb-5">
+      <div>
+        <h2 className="font-serif text-lg text-gray-900">AI Usage</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Resets daily at midnight MYT</p>
+      </div>
+      <button
+        type="button"
+        onClick={fetchUsage}
+        disabled={loadingUsage}
+        className="text-xs text-brand hover:underline disabled:opacity-40 transition-colors"
+      >
+        {loadingUsage ? "Refreshing…" : "Refresh usage"}
+      </button>
+    </div>
+  );
+
+  if (loadingUsage && !usage) {
     return (
-      <SectionCard title="AI Usage">
+      <div className="bg-white rounded-2xl card-border p-6">
+        {headerRow}
         <p className="text-sm text-gray-400">Loading usage data…</p>
-      </SectionCard>
+      </div>
     );
   }
 
-  const { dailyBudget, todayBreakdown, weekHistory } = usage;
-  const pct = (dailyBudget.callsUsed / dailyBudget.callsLimit) * 100;
-  const barColor = pct >= 100 ? "#DC2626" : pct >= 80 ? "#D97706" : "#1D5C3A";
-  const resetTime = new Date(dailyBudget.resetAt).toLocaleTimeString("en-MY", {
-    hour: "2-digit", minute: "2-digit",
-  });
+  if (!usage) {
+    return (
+      <div className="bg-white rounded-2xl card-border p-6">
+        {headerRow}
+        <p className="text-sm text-gray-400">Could not load usage data.</p>
+      </div>
+    );
+  }
+
+  const { dailyBudget, todayBreakdown, weekHistory, geminiConfigured } = usage;
+  const groqPct   = (dailyBudget.groq.used   / dailyBudget.groq.limit)   * 100;
+  const geminiPct = (dailyBudget.gemini.used  / dailyBudget.gemini.limit) * 100;
+  const totalPct  = (dailyBudget.total.used   / dailyBudget.total.limit)  * 100;
 
   return (
-    <SectionCard title="AI Usage">
-      {/* Row 1 — Daily budget */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-sm font-medium text-gray-700">Daily AI Calls (Groq)</span>
-          <span className="text-sm font-mono text-gray-600">{dailyBudget.callsUsed} / {dailyBudget.callsLimit}</span>
+    <div className="bg-white rounded-2xl card-border p-6">
+      {headerRow}
+
+      {/* Provider cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        {/* Groq card */}
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-800">Groq · Llama 3.1</span>
+            <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">PRIMARY</span>
+          </div>
+          <ProviderBar pct={groqPct} />
+          <p className="text-xs text-gray-700 mt-2 font-medium">
+            {dailyBudget.groq.used} of {dailyBudget.groq.limit} calls used today
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {dailyBudget.groq.remaining} remaining · Free tier
+          </p>
         </div>
-        <div className="w-full h-2 rounded-full bg-gray-100 overflow-hidden mb-1.5">
-          <div
-            style={{ width: `${Math.min(100, pct)}%`, background: barColor, transition: "width 0.3s" }}
-            className="h-full rounded-full"
-          />
+
+        {/* Gemini card */}
+        <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-800">Gemini · Flash 2.0</span>
+            <span className="text-[10px] font-bold tracking-wide px-2 py-0.5 rounded-full bg-gray-200 text-gray-500">FALLBACK</span>
+          </div>
+          {geminiConfigured ? (
+            <>
+              <ProviderBar pct={geminiPct} />
+              <p className="text-xs text-gray-700 mt-2 font-medium">
+                {dailyBudget.gemini.used} of {dailyBudget.gemini.limit} calls used today
+              </p>
+              {dailyBudget.gemini.used === 0
+                ? <p className="text-xs text-gray-400 mt-0.5">Not used today · Free tier</p>
+                : <p className="text-xs text-gray-400 mt-0.5">{dailyBudget.gemini.remaining} remaining · Free tier</p>
+              }
+            </>
+          ) : (
+            <>
+              <div className="w-full h-1.5 rounded-full bg-gray-200 mb-2" />
+              <p className="text-xs text-gray-400 mt-2">Not configured — add GEMINI_API_KEY to enable</p>
+            </>
+          )}
         </div>
-        <p className="text-xs text-gray-500">
-          {dailyBudget.callsUsed} of {dailyBudget.callsLimit} AI calls used today · Resets at {resetTime}
-        </p>
-        <p style={{ fontFamily: "var(--font-dm-mono, monospace)" }} className="text-xs text-gray-400 mt-1">
-          Each digest refresh uses up to 20 calls (5 article analyses)
-        </p>
       </div>
 
-      {/* Row 2 — Breakdown table */}
-      {todayBreakdown.length > 1 && (
-        <div className="mb-6">
+      {/* Total bar */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-gray-500">Total AI calls today</span>
+          <span className="text-xs font-mono text-gray-600">{dailyBudget.total.used} / {dailyBudget.total.limit}</span>
+        </div>
+        <ProviderBar pct={totalPct} />
+      </div>
+
+      {/* Breakdown table */}
+      <div className="mb-6">
+        <p className="text-xs font-medium text-gray-500 mb-2">Today's breakdown</p>
+        {todayBreakdown.length === 0 ? (
+          <p className="text-xs text-gray-400 italic">No calls yet today.</p>
+        ) : (
           <table className="w-full text-xs">
             <thead>
               <tr className="text-gray-400 border-b border-gray-100">
                 <th className="text-left py-1.5 font-medium">Call Type</th>
-                <th className="text-right py-1.5 font-medium">Count Today</th>
-                <th className="text-right py-1.5 font-medium">Tokens (est.)</th>
+                <th className="text-left py-1.5 font-medium">Provider</th>
+                <th className="text-right py-1.5 font-medium">Count</th>
+                <th className="text-right py-1.5 font-medium">Est. Tokens</th>
               </tr>
             </thead>
             <tbody>
-              {todayBreakdown.map((row) => (
-                <tr key={row.call_type} className={`border-b border-gray-50 ${row.call_type === "Total" ? "font-semibold text-gray-700" : "text-gray-600"}`}>
+              {todayBreakdown.map((row, i) => (
+                <tr key={i} className="text-gray-600 border-b border-gray-50">
                   <td className="py-1.5">{row.call_type}</td>
+                  <td className="py-1.5 capitalize text-gray-400">{row.provider}</td>
                   <td className="text-right py-1.5 font-mono">{row.count}</td>
                   <td className="text-right py-1.5 font-mono">{row.tokens_est.toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Row 3 — Cost saving tips */}
+      {/* Cost tips */}
       <div className="mb-6 p-4 bg-gray-50 rounded-xl">
-        <p style={{ fontFamily: "var(--font-dm-mono, monospace)" }} className="text-xs text-gray-500 uppercase tracking-wide mb-2">
-          How to reduce AI usage
-        </p>
+        <p className="text-xs text-gray-500 uppercase tracking-wide mb-2 font-medium">Cost saving tips</p>
         <ul className="space-y-1.5 text-xs text-gray-600">
-          <li>✓ Articles are cached — each article is only analysed once ever</li>
-          <li>✓ Low impact articles skip AI analysis entirely</li>
-          <li>↓ Reduce digest refreshes to save calls (each refresh = up to 20 AI calls)</li>
-          <li>↓ Fewer selected topics = fewer articles to analyse</li>
-          <li>↓ High Impact filter shows pre-analysed articles only</li>
+          <li>✓ Groq is free up to 14,400 calls/day — well above daily digest usage</li>
+          <li>✓ Each digest refresh uses 5 calls (1 per article — summary + impact combined)</li>
+          <li>✓ Articles are cached — same article never analysed twice</li>
+          <li>✓ Gemini is reserved as emergency fallback only</li>
         </ul>
       </div>
 
-      {/* Row 4 — Reset info + history */}
+      {/* Week history */}
       <div>
-        <p className="text-xs text-gray-400 mb-3">
-          Your daily budget resets at 12:00 AM Malaysia time (UTC+8)
-        </p>
+        <p className="text-xs text-gray-400 mb-3">Daily budget resets at 12:00 AM Malaysia time (UTC+8)</p>
         <button
           type="button"
           onClick={() => setShowHistory((v) => !v)}
           className="text-xs text-brand hover:underline transition-colors"
         >
-          {showHistory ? "Hide" : "View full"} usage history (last 7 days)
+          {showHistory ? "Hide" : "View"} usage history (last 7 days)
         </button>
         {showHistory && weekHistory.length > 0 && (
           <table className="w-full text-xs mt-3">
             <thead>
               <tr className="text-gray-400 border-b border-gray-100">
                 <th className="text-left py-1.5 font-medium">Date</th>
-                <th className="text-right py-1.5 font-medium">Calls Used</th>
-                <th className="text-right py-1.5 font-medium">Articles Analysed</th>
-                <th className="text-right py-1.5 font-medium">Feedback Calls</th>
+                <th className="text-right py-1.5 font-medium">Total</th>
+                <th className="text-right py-1.5 font-medium">Groq</th>
+                <th className="text-right py-1.5 font-medium">Gemini</th>
               </tr>
             </thead>
             <tbody>
               {weekHistory.map((row) => (
                 <tr key={row.date} className="text-gray-600 border-b border-gray-50">
                   <td className="py-1.5">{row.date}</td>
-                  <td className="text-right py-1.5 font-mono">{row.calls_used}</td>
-                  <td className="text-right py-1.5 font-mono">{row.articles_analysed}</td>
-                  <td className="text-right py-1.5 font-mono">{row.feedback_calls}</td>
+                  <td className="text-right py-1.5 font-mono">{row.total_calls}</td>
+                  <td className="text-right py-1.5 font-mono">{row.groq_calls}</td>
+                  <td className="text-right py-1.5 font-mono">{row.gemini_calls}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
         {showHistory && weekHistory.length === 0 && (
-          <p className="text-xs text-gray-400 mt-2">No usage data yet.</p>
+          <p className="text-xs text-gray-400 mt-2">No usage history yet.</p>
         )}
       </div>
-    </SectionCard>
+    </div>
   );
 }
 
@@ -300,7 +400,6 @@ export default function SettingsPage() {
   const [saving,      setSaving]      = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [loading,     setLoading]     = useState(true);
-  const [usage,       setUsage]       = useState<UsageData | null>(null);
   const [saveStatus,  setSaveStatus]  = useState<"idle" | "saving" | "saved">("idle");
 
   const loadedRef  = useRef(false);
@@ -347,11 +446,6 @@ export default function SettingsPage() {
       .then((d) => { if (d.lastSentAt) setLastEmailSent(d.lastSentAt); })
       .catch(() => {});
 
-    // Fetch AI usage
-    fetch("/api/usage")
-      .then((r) => r.json())
-      .then((d) => { if (d.dailyBudget) setUsage(d); })
-      .catch(() => {});
   }, []);
 
   // Auto-save: fires 800ms after any form value changes
@@ -520,7 +614,7 @@ export default function SettingsPage() {
       </div>
 
       {/* AI Usage */}
-      <AIUsageSection usage={usage} />
+      <AIUsageSection />
 
       {/* Auto-save status */}
       <div className="flex justify-end py-2">

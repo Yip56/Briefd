@@ -134,17 +134,36 @@ export function scoreArticles(
   const customKeywords = algorithmSettings?.custom_keywords  ?? [];
   const avoidanceKeywords = algorithmSettings?.avoidance_keywords ?? [];
 
+  const selectedTopicNames = userTopics.map((t) => t.topic.toLowerCase());
+
   const scored = articles.map((raw): ScoredArticle & { _score: number } => {
     const clickBonusPoints = clickedArticleUrls?.has(raw.articleUrl) ? clickBonus : 0;
+    const artTopic = (raw.topic ?? "").toLowerCase();
+    const isSelectedTopic =
+      selectedTopicNames.length === 0 ||
+      selectedTopicNames.some((t) => t === artTopic || artTopic.includes(t) || t.includes(artTopic));
+    const offTopicPenalty = isSelectedTopic ? 0 : -50;
+
+    const impactScoreBonus = ((raw.impactScore ?? 0) / 100) * 20;
+
+    const profileTagBonus = raw.profileTags
+      ? [preferences.profile.vehicle, preferences.profile.occupation, preferences.profile.location, preferences.profile.life_stage]
+          .filter(Boolean)
+          .filter((tag) => raw.profileTags!.some((pt) => pt.toLowerCase() === tag!.toLowerCase()))
+          .length * 25
+      : 0;
 
     const score =
       recencyScore(raw.publishedAt, recencyWeight) +
-      topicMatchScore(raw.topic, userTopics, topicWeight) +
+      (isSelectedTopic ? topicMatchScore(raw.topic, userTopics, topicWeight) : 0) +
       profileMatchScore(raw, preferences.profile, impactWeight) +
       keywordMatchScore(raw, userTopics, keywordWeight) +
       voteFeedbackScore(raw.externalId, feedbackMap, feedbackUp, feedbackDown) +
       customKeywordScore(raw, customKeywords, avoidanceKeywords) +
-      clickBonusPoints;
+      clickBonusPoints +
+      offTopicPenalty +
+      impactScoreBonus +
+      profileTagBonus;
 
     const impactLevel = deriveImpactLevel(score, raw.title);
 
@@ -161,7 +180,7 @@ export function scoreArticles(
       fetched_at: now,
       relevanceScore: Math.max(0, score),
       impactLevel,
-      aiSummary: raw.summary.slice(0, 200),
+      combined: raw.summary.slice(0, 200),
       userVote: feedbackMap[raw.externalId] ?? null,
       _score: score,
     };

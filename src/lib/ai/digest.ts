@@ -1,8 +1,7 @@
 import type { RawArticle, UserPreferences, DigestResult, ScoredArticle, VoteValue, UserAlgorithmSettings } from "@/lib/types";
 
-export type EnrichmentCache = Map<string, { aiSummary?: string | null; impactAnalysis?: string | null }>;
+export type EnrichmentCache = Map<string, { combined?: string | null }>;
 import { scoreArticles } from "@/lib/scoring/ranker";
-import { summariseArticle, getImpactAnalysis } from "./summarise";
 
 const TOTAL_ARTICLES = 15;
 const CONCURRENCY = 3;
@@ -95,8 +94,6 @@ export async function buildDigest(
     interleaved.push(...overflow.slice(0, TOTAL_ARTICLES - interleaved.length));
   }
 
-  const geminiProfile = algorithmSettings?.gemini_profile ?? "";
-
   const tasks = interleaved.map(
     (article): (() => Promise<ScoredArticle>) =>
       async () => {
@@ -110,10 +107,9 @@ export async function buildDigest(
           topic: article.topic ?? "",
           publishedAt: article.published_at ?? new Date().toISOString(),
         };
-        const cached         = enrichmentCache?.get(raw.externalId);
-        const aiSummary      = cached?.aiSummary      || await summariseArticle(raw, preferences.profile);
-        const impactAnalysis = cached?.impactAnalysis || await getImpactAnalysis(raw, preferences.profile, geminiProfile || undefined);
-        return { ...article, aiSummary, impactAnalysis };
+        const cached  = enrichmentCache?.get(raw.externalId);
+        const combined = cached?.combined ?? raw.summary.slice(0, 200);
+        return { ...article, combined };
       }
   );
 

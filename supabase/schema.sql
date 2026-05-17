@@ -150,6 +150,7 @@ CREATE TABLE user_algorithm_settings (
   custom_keywords JSONB DEFAULT '[]',
   avoidance_keywords JSONB DEFAULT '[]',
   gemini_profile TEXT DEFAULT '',
+  topic_composition JSONB DEFAULT '{}',
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
